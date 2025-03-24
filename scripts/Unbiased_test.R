@@ -1,84 +1,165 @@
-# UNBIASED TRANSMISSION PIPELINE ----------------------------------
+# UNBIASED TRANSMISSION ----------------------------------
 
-library(dplyr)
+remotes::install_github("benmarwick/signatselect", INSTALL_opts = "--no-multiarch --no-test-load")
 library(signatselect)
+library(dplyr)
 library(ggplot2)
-library(tibble)
+library(tidyr)
+library(purrr)
 
-pak::pkg_install("benmarwick/signatselect")
-
-# The parameters of the simulation are:
+# The parameters of the model are:
 #   N: Population size (integer)
-#   mu: Mutation rate (numeric, between 0 and 1, inclusive)
-#   p_0: Initial frequency of trait "A" (numeric, between 0 and 1, inclusive)
-#   t_max: Number of generations (integer)
-#   r_max: Number of replicate runs (integer)
+#   mu: innovation rate (numeric, between 0 and 1, inclusive)
+#   burnin: number of initial steps (iterations) discarded
+#   timesteps: actual number of time steps or "generations" after the burnin
 
-unbiased_mutation <- function(N, mu, p_0, t_max, r_max) {
-  # Validate p_0 and mu probabilities
-  # If sampling returns negative or >1, we warn and provide a default value
-  if(p_0 < 0 || p_0 > 1) {
-    warning("p_0 must be between 0 and 1 (inclusive).")
-    p_0 <- 0.5
-  }
-  if(mu < 0 || mu > 1) {
-    warning("mu must be between 0 and 1 (inclusive).")
-    mu <- 0.5
-  }
-  # Create the output tibble
-  output <- tibble(generation = rep(1:t_max, r_max), 
-                   p = as.numeric(rep(NA, t_max * r_max)), 
-                   run = as.factor(rep(1:r_max, each = t_max))) 
+N <- 100 # Number of traits
+mu <- 0.01
+burnin <- 100 # Get rid of arbitrary initial conditions
+timesteps <- 100
+
+# Significance level
+p_value_lvl <- 0.05
+
+# Run the test 100 times and store the results
+n_runs <- 100
+non_significant_count <- 0
+
+for (run in 1:n_runs) {
+  ini <- 1:N # Initial cultural variants
+  traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Each row is a time step (100), and each column a trait (100)
+
+  pop <- ini # initial population of variants to pop
+  maxtrait <- N 
+
+  # Loops before reaching equilibrium, determined by "burnin"
+  for(i in 1:burnin) {
+    # neutral transmission:
+    pop <- sample(pop,replace=T)
   
-  for (r in 1:r_max) { # Loop over runs
-    # Initialize population of A and B based on p_0
-    population <- tibble(trait = sample(c("A", "B"), N, replace = TRUE, 
-                                        prob = c(p_0, 1 - p_0)))
-    # Initial frequency of A
-    output[output$generation == 1 & output$run == r, ]$p <- 
-      sum(population$trait == "A") / N 
-    
-    for (t in 2:t_max) { # Loop over generations
-      
-      # Determine the probability of "mutant" individuals
-      # If they mutate, TRUE is returned
-      mutate <- sample(c(TRUE, FALSE), N, prob = c(mu, 1 - mu), replace = TRUE) 
-      
-      # Only select those traits that mutate
-      population$trait[mutate] <- ifelse(population$trait[mutate] == "A", "B", "A")
-      # mutants which A = TRUE, B will be returned
-      # mutants which A = FALSE, A will be returned
-      
-      # Get p and put it into output slot for this generation t and run r
-      output[output$generation == t & output$run == r, ]$p <- 
-        sum(population$trait == "A") / N 
+    # Add innovations
+    innovate <- which(runif(N)<mu) # which individual innovates (>0.01 = TRUE)
+    if (length(innovate)>0) #if anyone innovates
+    {
+    number.new.variants <- length(innovate) # record the number
+    new.variants <- maxtrait:(maxtrait+number.new.variants - 1) # create new variants
+    pop[innovate] <- new.variants # assign the innovations to the innovators
+    maxtrait <- max(pop) # update maxtrait matrix
     }
   }
-  # Export data from function
-  output 
+
+  # And loops after reaching equilibrium
+  for (i in 1:timesteps)
+  {
+    #transmission:
+    pop <- sample(pop,replace=T)
+    #innovation
+    innovate <- which(runif(N)<mu) 
+    if (length(innovate)>0) 
+    {
+      number.new.variants <- length(innovate) #how many innovators?
+      new.variants <- maxtrait:(maxtrait+number.new.variants - 1) #create new variants
+      pop[innovate] <- new.variants #assign the innovations to the innovators
+      maxtrait <- max(pop) #update maxtrait 
+    }
+  
+    traitmatrix[i,] <- pop #record the variants of each individual
+  }
+
+  unique_values <- sort(unique(as.vector(traitmatrix))) #all unique variants observed
+
+  freq_mat <- t(apply(traitmatrix, 1, function(row) {
+    tab <- table(factor(row, levels = unique_values))  # Count occurrences, ensuring all values are represented
+    as.numeric(tab)
+  }))
+
+  colnames(freq_mat) <- unique_values # Assign column names for readability
+  # Prepare input for fit() function
+  freq.df <- as.data.frame(freq_mat)
+  freq.df$time <- 1:timesteps # add time column
+
+  #Convert to long format for fit()
+  freq_long <- freq.df %>%
+    pivot_longer(cols = -time, names_to = "variant", values_to = "freq") %>%
+    mutate(variant = as.integer(variant))  # Variant as integers
+  
+  # Compute freq as ratio of the count of each variant to the total count at each time step
+  freq_long <- freq_long %>%
+    group_by(time) %>%
+    mutate(total_count = sum(freq)) %>%
+    mutate(freq = freq / total_count) %>%
+    ungroup()
+  
+  # Filter out variants that appear in fewer than 3 time points
+  freq_long_filtered <- freq_long %>%
+    group_by(variant) %>%
+    filter(n() >= 3) %>% # fit() requires more than 3 points
+    ungroup()
+  
+  print(head(freq_long_filtered))
+  
+  fit_safely <- function(time, v) {
+    tryCatch({
+      fit_result <- fit(time = time, v = v)
+      return(list(result = fit_result))  # Return the result as a list
+    }, error = function(e) {
+      return(list(result = NULL))  # Return NULL in case of an error
+    })
+  }
+  
+  df_fit_test_results <- freq_long_filtered %>%
+    group_by(variant) %>%
+    nest() %>%
+    mutate(fit_test = map(data, ~fit_safely(time = .x$time, v = .x$freq))) %>%
+    mutate(fit_p = map(fit_test, ~.x$result$p.value)) %>%
+    unnest(fit_p) %>%
+    mutate(sig = ifelse(fit_p <= 0.05, "selection", "neutral"))
+  
+  # Checking the results
+  head(df_fit_test_results)
+  summary(freq_long)
+  summary(freq_long_filtered)
+
+  # Run the fit() function on the entire dataset (no filtering)
+  fit_result <- tryCatch({
+    fit(time = freq_long_filtered$time, v = freq_long_filtered$freq)
+  }, error = function(e) {
+    return(NULL)  # Handle errors in the fit() function (e.g., if it fails)
+  })
+
+  # Check if the p-value is non-significant (p > 0.05)
+  if (!is.null(fit_result)) {
+    print(fit_result)  # Print the result for debugging
+    if (fit_result$p.value > p_value_lvl) {
+      non_significant_count <- non_significant_count + 1  # Count non-significant result
+    }
+  }
 }
 
-# Parameters for simulation
-N <- 10000     
-mu <- 0.05   
-p_0 <- 0.5    
-t_max <- 150  
-r_max <- 1  # 1 to match "fit()" input format
+non_significant_proportion  <- non_significant_count / n_runs
+print(paste("Proportion of non-significant results: ", non_significant_proportion))
 
-
-sim_data <- unbiased_mutation(N, mu, p_0, t_max, r_max) # Simulate neutrality
-plot_multiple_runs(sim_data)
-
-# Prepare input for fit() function
-neutral_test <- tibble(
-  time = sim_data$generation,
-  freq = sim_data$p
-)
-
-# Apply the fit() function
-fit_result <- fit(time = neutral_test$time, v = neutral_test$freq)
+print(non_significant_count)
 print(fit_result)
 
+# --- PLOTS ---
 
+# One single plot
+ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant, color = as.factor(variant))) +
+  geom_line(alpha = 0.8) +
+  labs(title = "Frequency Trajectories of All Variants", x = "Time", y = "Frequency") +
+  theme_minimal() +
+  theme(legend.position = "none")
 
+# Facet
+ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
+  geom_line() +
+  facet_wrap(~variant) +
+  theme_minimal(base_size = 8) +
+  labs(x = "Time", y = "Frequency") +
+  theme(legend.position = "none")
 
+                   
+                   
+                   
+                   
