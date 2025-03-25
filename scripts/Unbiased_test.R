@@ -23,7 +23,7 @@ p_value_lvl <- 0.05
 
 # Run the test 100 times and store the results
 n_runs <- 100
-non_significant_count <- 0
+neutral_counts_per_run <- numeric(n_runs)
 
 for (run in 1:n_runs) {
   ini <- 1:N # Initial cultural variants
@@ -83,81 +83,60 @@ for (run in 1:n_runs) {
     pivot_longer(cols = -time, names_to = "variant", values_to = "freq") %>%
     mutate(variant = as.integer(variant))  # Variant as integers
   
-  # Compute freq as ratio of the count of each variant to the total count at each time step
+  # Compute relative freq
   freq_long <- freq_long %>%
     group_by(time) %>%
-    mutate(total_count = sum(freq)) %>%
-    mutate(freq = freq / total_count) %>%
+    mutate(freq = freq / sum(freq)) %>%
     ungroup()
   
-  # Filter out variants that appear in fewer than 3 time points
-  freq_long_filtered <- freq_long %>%
-    group_by(variant) %>%
-    filter(n() >= 3) %>% # fit() requires more than 3 points
-    ungroup()
+  # Safe version of fit, so that it doesn't stop, it just returns NA
+  fit_safely <- safely(fit, 
+                       otherwise = data.frame(fit_stat = NA, 
+                                              fit_p = NA))
   
-  print(head(freq_long_filtered))
+  # Filter variants with less than 3 time points
+  list_of_dfs_three_or_more <- keep(list_of_dfs, ~sum(.x$freq > 0) >= 3)
   
-  fit_safely <- function(time, v) {
-    tryCatch({
-      fit_result <- fit(time = time, v = v)
-      return(list(result = fit_result))  # Return the result as a list
-    }, error = function(e) {
-      return(list(result = NULL))  # Return NULL in case of an error
-    })
-  }
-  
-  df_fit_test_results <- freq_long_filtered %>%
-    group_by(variant) %>%
-    nest() %>%
+  df_fit_test_results <- list_of_dfs_three_or_more %>%
+    bind_rows(.id = "variant") %>%
+    nest(-variant) %>%
     mutate(fit_test = map(data, ~fit_safely(time = .x$time, v = .x$freq))) %>%
-    mutate(fit_p = map(fit_test, ~.x$result$p.value)) %>%
+    mutate(fit_p = map(fit_test, ~.x$result %>% bind_rows)) %>%
     unnest(fit_p) %>%
-    mutate(sig = ifelse(fit_p <= 0.05, "selection", "neutral"))
+    mutate(sig = ifelse(fit_p > p_value_lvl, "neutral", "selection"))
   
-  # Checking the results
-  head(df_fit_test_results)
-  summary(freq_long)
-  summary(freq_long_filtered)
-
-  # Run the fit() function on the entire dataset (no filtering)
-  fit_result <- tryCatch({
-    fit(time = freq_long_filtered$time, v = freq_long_filtered$freq)
-  }, error = function(e) {
-    return(NULL)  # Handle errors in the fit() function (e.g., if it fails)
-  })
-
-  # Check if the p-value is non-significant (p > 0.05)
-  if (!is.null(fit_result)) {
-    print(fit_result)  # Print the result for debugging
-    if (fit_result$p.value > p_value_lvl) {
-      non_significant_count <- non_significant_count + 1  # Count non-significant result
-    }
-  }
+  # Count neutral cases for this run
+  neutral_counts_per_run[run] <- sum(df_fit_test_results$sig == "neutral", na.rm = TRUE)
 }
 
-non_significant_proportion  <- non_significant_count / n_runs
-print(paste("Proportion of non-significant results: ", non_significant_proportion))
+# Final count of how often the FIT test detected neutrality
+total_neutral_detections <- sum(neutral_counts_per_run)
 
-print(non_significant_count)
-print(fit_result)
+cat("Total neutral detections out of", (n_runs * N), "tests:", total_neutral_detections, "\n")
+cat("Proportion of neutral detections:", total_neutral_detections / (n_runs * N), "\n")
+
 
 # --- PLOTS ---
 
 # One single plot
-ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant, color = as.factor(variant))) +
+ggplot(freq_long, aes(x = time, y = freq, group = variant, color = as.factor(variant))) +
   geom_line(alpha = 0.8) +
   labs(title = "Frequency Trajectories of All Variants", x = "Time", y = "Frequency") +
   theme_minimal() +
   theme(legend.position = "none")
 
 # Facet
-ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
+ggplot(freq_long, aes(x = time, y = freq, group = variant)) +
   geom_line() +
   facet_wrap(~variant) +
   theme_minimal(base_size = 8) +
   labs(x = "Time", y = "Frequency") +
   theme(legend.position = "none")
+
+ggplot(freq_long_sig, aes(time, freq, colour = sig, group = variant)) +
+  geom_smooth(se = FALSE, method = "loess") +  # Smooth instead of raw lines
+  facet_wrap(~variant, scales = "free_y") +
+  theme_minimal()
 
                    
                    
