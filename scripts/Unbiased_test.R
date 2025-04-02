@@ -5,15 +5,18 @@ library(signatselect)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(purrr)
 
-N <- 100 # Number of traits
+N <- 80 # Number of traits
 mu <- 0.01 # innovation rate (numeric, between 0 and 1, inclusive)
 burnin <- 100 # number of initial steps (iterations) discarded
-timesteps <- 100 # actual number of time steps or "generations" after the burnin
+timesteps <- 100 # actual number of time steps or "generations" after the burn-in
 p_value_lvl <- 0.05 # Significance level
 n_runs <- 100 # number of test runs
 
 neutral_counts_per_run_snapshot <- numeric(n_runs)
+
+# Pipeline -----
 
 for (run in 1:n_runs) {
   ini <- 1:N # Initial cultural variants
@@ -64,24 +67,42 @@ for (run in 1:n_runs) {
     filter(freq > 0) %>% # remove zeros
     mutate(variant = as.integer(variant))
   
-  # Apply FIT test with proper filtering
-  fit_results <- freq_long %>%
+  # Filter data to 3 time points
+  freq_long_filtered <- freq_long %>%
     group_by(variant) %>%
     filter(n_distinct(time) >= 3) %>%
-    group_split() %>%
+    ungroup()
+  
+  # Apply FIT
+  fit_results <- freq_long_filtered %>%
+    group_split(variant) %>%
     map_dfr(~ {
-      res <- fit(time = .x$time, v = .x$freq)
+      df <- as.data.frame(.x)  # Ensure .x is a dataframe
+      
+      # Check if we have enough data points
+      if (nrow(df) < 3) {
+        return(data.frame(variant = df$variant[1], time_points = nrow(df), fit_p = NA, stringsAsFactors = FALSE))
+      }
+      
+      # Safely apply the FIT test
+      res <- tryCatch(
+        fit(time = df$time, v = df$freq),
+        error = function(e) list(fit_p = NA)  # Handle errors gracefully
+      )
+      
       data.frame(
-        variant = .x$variant[1],
-        time_points = nrow(.x),
+        variant = df$variant[1],
+        time_points = nrow(df),
         fit_p = res$fit_p,
         stringsAsFactors = FALSE
       )
     }) %>%
-    mutate(sig = ifelse(fit_p > p_value_lvl, "neutral", "selection"),
-           sig = ifelse(is.na(fit_p), "invalid", sig))
+    mutate(
+      sig = ifelse(fit_p > p_value_lvl, "neutral", "selection"),
+      sig = ifelse(is.na(fit_p), "NA", sig)  # missing values
+    )
   
-  # Count neutral cases for this run
+  # Count neutral cases for a run
   neutral_counts_per_run_snapshot[run] <- sum(fit_results$sig == "neutral", na.rm = TRUE)
 }
 
@@ -94,29 +115,25 @@ cat("Proportion of neutral detections:", total_neutral_detections_snapshot / (n_
 freq_long_sig <- freq_long %>%
   left_join(fit_results %>% select(variant, sig), by = "variant")
 
+unique(freq_long_filtered$variant)
+
+# --- PLOTS ---
+
+# One single plot
 ggplot(freq_long_sig, aes(x = time, y = freq, color = sig, group = variant)) +
   geom_line() +
   scale_color_viridis_d(name = "", begin = 0.25, end = 0.75) +
   theme_minimal(base_size = 10) +
   ggtitle("FIT Classification of Neutral Transmission Data")
 
-
-# --- PLOTS ---
-
-# One single plot
-ggplot(freq_long, aes(x = time, y = freq, group = variant, color = as.factor(variant))) +
-  geom_line(alpha = 0.8) +
-  labs(title = "Frequency Trajectories of All Variants", x = "Time", y = "Frequency") +
-  theme_minimal() +
-  theme(legend.position = "none")
-
 # Facet
-ggplot(freq_long_sig, aes(x = time, y = freq, group = variant)) +
-  geom_line() +
-  facet_wrap(~variant) +
+ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
+  geom_line(stat = "identity") +  # lines are drawn for multiple points
+  facet_wrap(~variant, scales = "free_y") +  # test is computed with total frequency, not relative
   theme_minimal(base_size = 8) +
   labs(x = "Time", y = "Frequency") +
   theme(legend.position = "none")
+
 
 
 
