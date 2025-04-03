@@ -7,16 +7,19 @@ library(ggplot2)
 library(tidyr)
 library(purrr)
 
+# Parameters --------
 N <- 80 # Number of traits
-mu <- 0.01 # innovation rate (numeric, between 0 and 1, inclusive)
+mu <- 0.1 # innovation rate (numeric, between 0 and 1, inclusive)
 burnin <- 100 # number of initial steps (iterations) discarded
 timesteps <- 100 # actual number of time steps or "generations" after the burn-in
 p_value_lvl <- 0.05 # Significance level
 n_runs <- 100 # number of test runs
 
-neutral_counts_per_run_snapshot <- numeric(n_runs)
+neutral_counts_per_run_snapshot <- numeric(n_runs) # empty vector for counting neutral detections
 
-# Pipeline -----
+accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each run
+
+# Pipeline ---------
 
 for (run in 1:n_runs) {
   ini <- 1:N # Initial cultural variants
@@ -73,21 +76,21 @@ for (run in 1:n_runs) {
     filter(n_distinct(time) >= 3) %>%
     ungroup()
   
-  # Apply FIT
+  # FIT application and storing
   fit_results <- freq_long_filtered %>%
     group_split(variant) %>%
     map_dfr(~ {
-      df <- as.data.frame(.x)  # Ensure .x is a dataframe
+      df <- as.data.frame(.x)  # .x is a dataframe
       
-      # Check if we have enough data points
+      # check if we have enough data points
       if (nrow(df) < 3) {
         return(data.frame(variant = df$variant[1], time_points = nrow(df), fit_p = NA, stringsAsFactors = FALSE))
       }
       
-      # Safely apply the FIT test
+      # safely apply FIT
       res <- tryCatch(
         fit(time = df$time, v = df$freq),
-        error = function(e) list(fit_p = NA)  # Handle errors gracefully
+        error = function(e) list(fit_p = NA)  # handle errors
       )
       
       data.frame(
@@ -98,26 +101,44 @@ for (run in 1:n_runs) {
       )
     }) %>%
     mutate(
-      sig = ifelse(fit_p > p_value_lvl, "neutral", "selection"),
+      sig = ifelse(fit_p > p_value_lvl, "neutral", "selection"), # neutral if >0.05
       sig = ifelse(is.na(fit_p), "NA", sig)  # missing values
     )
   
-  # Count neutral cases for a run
+  # Average of observed vs expected neutral detection
+  
+  # count neutral cases per run
   neutral_counts_per_run_snapshot[run] <- sum(fit_results$sig == "neutral", na.rm = TRUE)
+  
+  # count total variants tested and the expected %
+  total_variants_tested <- nrow(fit_results)
+  expected_neutral_count <- round(0.95 * total_variants_tested) # Expected proportion based on statistical power
+  
+  # observed neutral variants in one run
+  actual_neutral_count <- sum(fit_results$sig == "neutral", na.rm = TRUE)
+  
+  # match rate
+  neutral_match_rate <- actual_neutral_count / expected_neutral_count
+  
+  # store results per run in the empty object
+  accuracy_snapshot[run] <- neutral_match_rate
 }
 
-# Final count
-total_neutral_detections_snapshot <- sum(neutral_counts_per_run_snapshot)
-cat("Total neutral detections out of", (n_runs * N), "tests:", total_neutral_detections_snapshot, "\n")
-cat("Proportion of neutral detections:", total_neutral_detections_snapshot / (n_runs * N), "\n")
+accuracy_snapshot[50] # we can check each run individually
+
+total_neutral_detections <- sum(neutral_counts_per_run_snapshot)
+overall_accuracy <- mean(accuracy_snapshot, na.rm = TRUE) # mean accuracy across runs
+
+# Summary
+cat("Total neutral detections:", total_neutral_detections, "\n")
+cat("Mean accuracy of FIT test across runs:", overall_accuracy, "\n")
+
+
+# --- PLOTS ---
 
 # Visualization
 freq_long_sig <- freq_long %>%
   left_join(fit_results %>% select(variant, sig), by = "variant")
-
-unique(freq_long_filtered$variant)
-
-# --- PLOTS ---
 
 # One single plot
 ggplot(freq_long_sig, aes(x = time, y = freq, color = sig, group = variant)) +
