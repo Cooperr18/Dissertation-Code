@@ -7,15 +7,17 @@ library(ggplot2)
 library(tidyr)
 library(purrr)
 
-# Parameters --------
-N <- 80 # Number of traits
-mu <- 0.1 # innovation rate (numeric, between 0 and 1, inclusive)
-burnin <- 100 # number of initial steps (iterations) discarded
-timesteps <- 100 # actual number of time steps or "generations" after the burn-in
-p_value_lvl <- 0.05 # Significance level
-n_runs <- 100 # number of test runs
+set.seed(1234)
 
-neutral_counts_per_run_snapshot <- numeric(n_runs) # empty vector for counting neutral detections
+# Parameters --------
+N <- 100 # Number of individuals
+mu <- 0.01 # innovation rate (numeric, between 0 and 1, inclusive)
+burnin <- 100 # number of initial steps (iterations) discarded
+timesteps <- 1000 # actual number of time steps or "generations" after the burn-in
+p_value_lvl <- 0.05 # Significance level
+n_runs <- 1000 # number of test runs
+
+neutral_counts_per_run_snapshot <- numeric(n_runs) # empty vector for counting neutral variants
 
 accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each run
 
@@ -23,7 +25,7 @@ accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each r
 
 for (run in 1:n_runs) {
   ini <- 1:N # Initial cultural variants
-  traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Each row is a time step (100), and each column a trait (100)
+  traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Each row is a time step, and each column an individual
   pop <- ini # initial population of variants to pop
   maxtrait <- N 
 
@@ -61,7 +63,7 @@ for (run in 1:n_runs) {
     tab <- table(factor(row, levels = unique_variants))
     as.numeric(tab)/N # Convert to frequencies
   }))
-  colnames(freq_mat) <- unique_variants
+  colnames(freq_mat) <- unique_variants # give names
 
   # Prepare FIT input
   freq_long <- as.data.frame(freq_mat) %>%
@@ -105,33 +107,31 @@ for (run in 1:n_runs) {
       sig = ifelse(is.na(fit_p), "NA", sig)  # missing values
     )
   
-  # Average of observed vs expected neutral detection
+  # Store metrics
+  total_variants <- nrow(fit_results)
+  FPR <- sum(fit_results$sig == "selection") / total_variants  # False positives
+  TNR <- sum(fit_results$sig == "neutral") / total_variants     # True negatives
   
-  # count neutral cases per run
-  neutral_counts_per_run_snapshot[run] <- sum(fit_results$sig == "neutral", na.rm = TRUE)
-  
-  # count total variants tested and the expected %
-  total_variants_tested <- nrow(fit_results)
-  expected_neutral_count <- round(0.95 * total_variants_tested) # Expected proportion based on statistical power
-  
-  # observed neutral variants in one run
-  actual_neutral_count <- sum(fit_results$sig == "neutral", na.rm = TRUE)
-  
-  # match rate
-  neutral_match_rate <- actual_neutral_count / expected_neutral_count
-  
-  # store results per run in the empty object
-  accuracy_snapshot[run] <- neutral_match_rate
+  accuracy_snapshot[run] <- TNR  # Or track both FPR and TNR
 }
 
-accuracy_snapshot[50] # we can check each run individually
-
-total_neutral_detections <- sum(neutral_counts_per_run_snapshot)
+# Check results
+FPR
+TNR
+accuracy_snapshot[70] # we can check each run individually
 overall_accuracy <- mean(accuracy_snapshot, na.rm = TRUE) # mean accuracy across runs
+overall_accuracy
 
-# Summary
-cat("Total neutral detections:", total_neutral_detections, "\n")
-cat("Mean accuracy of FIT test across runs:", overall_accuracy, "\n")
+# Proportion of the runs have a 95% of detection
+over95 <- sum(accuracy_snapshot >= 0.95)
+high_accuracy_runs <- over95/n_runs*100
+high_accuracy_runs
+
+# Proportion of NA from the simulation
+sumNA <- sum(fit_results$sig == "NA")
+sumNEUTRAL <- sum(fit_results$sig == "neutral")
+percentageNA <- sumNA/sumNEUTRAL * 100
+percentageNA
 
 
 # --- PLOTS ---
@@ -141,7 +141,7 @@ freq_long_sig <- freq_long %>%
   left_join(fit_results %>% select(variant, sig), by = "variant")
 
 # One single plot
-ggplot(freq_long_sig, aes(x = time, y = freq, color = sig, group = variant)) +
+ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
   geom_line() +
   scale_color_viridis_d(name = "", begin = 0.25, end = 0.75) +
   theme_minimal(base_size = 10) +
@@ -154,6 +154,22 @@ ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
   theme_minimal(base_size = 8) +
   labs(x = "Time", y = "Frequency") +
   theme(legend.position = "none")
+
+# Plot distribution of TNR, marking the 95% threshold
+ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR)) +
+  geom_histogram(binwidth = 0.009, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
+  labs(title = "Neutral Rate (TNR) Across Runs", 
+       subtitle = "Red line = expected TNR (1 - p_value_lvl)", 
+       x = "True Neutral Rate", 
+       y = "Frequency",
+       caption = paste("Average =", round(mean(accuracy_snapshot), 3), "|", 
+                       "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
+                       "Number of runs =", n_runs)) +
+  theme_minimal()
+
+
+
 
 
 
