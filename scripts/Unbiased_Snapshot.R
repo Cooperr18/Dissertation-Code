@@ -5,17 +5,16 @@ library(signatselect)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
-library(purrr)
 
 set.seed(1234)
 
 # Parameters --------
 N <- 100 # Number of individuals
 mu <- 0.01 # innovation rate (numeric, between 0 and 1, inclusive)
-burnin <- 100 # number of initial steps (iterations) discarded
+burnin <- 1000 # number of initial steps (iterations) discarded
 timesteps <- 1000 # actual number of time steps or "generations" after the burn-in
 p_value_lvl <- 0.05 # Significance level
-n_runs <- 1000 # number of test runs
+n_runs <- 100 # number of test runs
 
 neutral_counts_per_run_snapshot <- numeric(n_runs) # empty vector for counting neutral variants
 
@@ -156,11 +155,11 @@ ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
   theme(legend.position = "none")
 
 # Plot distribution of TNR, marking the 95% threshold
-ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR)) +
-  geom_histogram(binwidth = 0.009, fill = "skyblue", color = "black") +
+plot_neutral_snapshot <- ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR)) +
+  geom_histogram(binwidth = 0.005, fill = "skyblue", color = "black") +
   geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
-  labs(title = "Neutral Rate (TNR) Across Runs", 
-       subtitle = "Red line = expected TNR (1 - p_value_lvl)", 
+  labs(title = "Neutral Rate (TNR) Across Runs 'Snapshot' Model", 
+       subtitle = "Red line = expected TNR (1 - α)", 
        x = "True Neutral Rate", 
        y = "Frequency",
        caption = paste("Average =", round(mean(accuracy_snapshot), 3), "|", 
@@ -168,7 +167,7 @@ ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR)) +
                        "Number of runs =", n_runs)) +
   theme_minimal()
 
-
+grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
 
 
 
