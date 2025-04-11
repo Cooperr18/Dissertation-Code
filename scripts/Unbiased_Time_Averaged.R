@@ -4,13 +4,14 @@ library(signatselect)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
-library(grid)
+library(gridExtra)
+library(purrr)
 
 set.seed(1234)
 
 # Parameters --------
 N <- 100 # Number of individuals
-mu <- 0.05 # innovation rate (numeric, between 0 and 1, inclusive)
+mu <- 0.2 # innovation rate (numeric, between 0 and 1, inclusive)
 burnin <- 1000 # number of initial steps (iterations) discarded
 timesteps <- 1000 # actual number of time steps or "generations" after the burn-in
 p_value_lvl <- 0.05 # Significance level
@@ -120,7 +121,7 @@ for (run in 1:n_runs) {
   FPR <- sum(fit_results$sig == "selection") / total_variants  # False positives
   TNR <- sum(fit_results$sig == "neutral") / total_variants     # True negatives
   
-  accuracy_ta[run] <- TNR  # track TNR
+  accuracy_ta[run] <- TNR  # track TNR across runs
 }
 
 # Check results
@@ -151,11 +152,12 @@ plot_neutral_ta <- ggplot(data.frame(TNR = accuracy_ta), aes(x = TNR)) +
        subtitle = "Red line = expected TNR (1 - α)", 
        x = "True Neutral Rate", 
        y = "Frequency",
-       caption = paste("Average =", round(mean(accuracy_ta), 3), "|", 
+       caption = paste("Mean =", round(mean(accuracy_ta), 3), "|", 
                        "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
                        "Number of runs =", n_runs)) +
   theme_minimal()
 
 grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
+plot_neutral_ta
 
 

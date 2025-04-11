@@ -36,3 +36,16 @@ plot_neutral_ta <- ggplot(data.frame(TNR = accuracy_ta), aes(x = TNR)) +
   theme_minimal()
 
 grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
+
+# I modified the caption of the figure from "Average" to "Mean"
+plot_neutral_ta <- ggplot(data.frame(TNR = accuracy_ta), aes(x = TNR)) +
+  geom_histogram(binwidth = 0.002, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
+  labs(title = "Neutral Rate (TNR) Across Runs 'Time Averaged' Model", 
+       subtitle = "Red line = expected TNR (1 - α)", 
+       x = "True Neutral Rate", 
+       y = "Frequency",
+       caption = paste("Mean =", round(mean(accuracy_ta), 3), "|", 
+                       "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
+                       "Number of runs =", n_runs)) +
+  theme_minimal()

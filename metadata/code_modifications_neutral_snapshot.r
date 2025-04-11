@@ -64,3 +64,16 @@ plot_neutral_snapshot <- ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR
 
 grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
 
+# Slight modification of the plot, from "Average" to "Mean"
+plot_neutral_snapshot <- ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR)) +
+  geom_histogram(binwidth = 0.005, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
+  labs(title = "Neutral Rate (TNR) Across Runs 'Snapshot' Model", 
+       subtitle = "Red line = expected TNR (1 - α)", 
+       x = "True Neutral Rate", 
+       y = "Frequency",
+       caption = paste("Mean =", round(mean(accuracy_snapshot), 3), "|", 
+                       "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
+                       "Number of runs =", n_runs)) +
+  theme_minimal()
+
