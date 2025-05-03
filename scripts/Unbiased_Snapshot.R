@@ -1,6 +1,8 @@
 # UNBIASED TRANSMISSION "SNAPSHOT" VERSION ----------------------------------
 
-remotes::install_github("benmarwick/signatselect", INSTALL_opts = "--no-multiarch --no-test-load")
+install.packages("pak")
+pak::pkg_install("benmarwick/signatselect")
+
 library(signatselect)
 library(dplyr)
 library(ggplot2)
@@ -159,16 +161,16 @@ ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
 plot_neutral_snapshot <- ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR)) +
   geom_histogram(binwidth = 0.005, fill = "skyblue", color = "black") +
   geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
-  labs(title = "Neutral Rate (TNR) Across Runs 'Snapshot' Model", 
+  labs(title = "Neutral Detection Rate (NDR) Across Runs 'Snapshot' Model", 
        subtitle = "Red line = expected TNR (1 - α)", 
        x = "True Neutral Rate", 
        y = "Frequency",
        caption = paste("Average =", round(mean(accuracy_snapshot), 3), "|", 
                        "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
-                       "Number of runs =", n_runs)) +
+                       "Number of runs =", n_runs, "|",
+                       "% NA =", round(percentageNA, 2), "%")) +
   theme_minimal()
 
-grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
 
 
 
