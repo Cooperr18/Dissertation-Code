@@ -14,7 +14,7 @@ set.seed(1234)
 
 # Parameters --------
 N <- 100 # Number of individuals
-mu <- 0.01 # innovation rate (numeric, between 0 and 1, inclusive)
+mu <- 0.02 # innovation rate (numeric, between 0 and 1, inclusive)
 burnin <- 1000 # number of initial steps (iterations) discarded
 timesteps <- 1000 # actual number of time steps or "generations" after the burn-in
 p_value_lvl <- 0.05 # Significance level
@@ -112,14 +112,14 @@ for (run in 1:n_runs) {
   # Store metrics
   total_variants <- nrow(fit_results)
   FPR <- sum(fit_results$sig == "selection") / total_variants  # False positives
-  TNR <- sum(fit_results$sig == "neutral") / total_variants     # True negatives
+  NDR <- sum(fit_results$sig == "neutral") / total_variants     # True negatives
   
-  accuracy_snapshot[run] <- TNR  # Or track both FPR and TNR
+  accuracy_snapshot[run] <- NDR  # Or track both FPR and NDR
 }
 
 # Check results
 FPR
-TNR
+NDR
 accuracy_snapshot[70] # we can check each run individually
 overall_accuracy <- mean(accuracy_snapshot, na.rm = TRUE) # mean accuracy across runs
 overall_accuracy
@@ -157,13 +157,13 @@ ggplot(freq_long_filtered, aes(x = time, y = freq, group = variant)) +
   labs(x = "Time", y = "Frequency") +
   theme(legend.position = "none")
 
-# Plot distribution of TNR, marking the 95% threshold
-plot_neutral_snapshot <- ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR)) +
+# Plot distribution of NDR, marking the 95% threshold
+plot_neutral_snapshot <- ggplot(data.frame(NDR = accuracy_snapshot), aes(x = NDR)) +
   geom_histogram(binwidth = 0.005, fill = "skyblue", color = "black") +
   geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
   labs(title = "Neutral Detection Rate (NDR) Across Runs 'Snapshot' Model", 
-       subtitle = "Red line = expected TNR (1 - α)", 
-       x = "True Neutral Rate", 
+       subtitle = "Red line = expected NDR (1 - α)", 
+       x = "Neutral Detection Rate", 
        y = "Frequency",
        caption = paste("Average =", round(mean(accuracy_snapshot), 3), "|", 
                        "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
@@ -171,6 +171,7 @@ plot_neutral_snapshot <- ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR
                        "% NA =", round(percentageNA, 2), "%")) +
   theme_minimal()
 
+plot_neutral_snapshot
 
 
 

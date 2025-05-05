@@ -15,7 +15,7 @@ mu <- 0.2 # innovation rate (numeric, between 0 and 1, inclusive)
 burnin <- 1000 # number of initial steps (iterations) discarded
 timesteps <- 1000 # actual number of time steps or "generations" after the burn-in
 p_value_lvl <- 0.05 # Significance level
-n_runs <- 200 # number of test runs
+n_runs <- 100 # number of test runs
 time_window <- 20 # size of averaging windows
 
 neutral_counts_per_run_ta <- numeric(n_runs) # empty vector for counting neutral variants
@@ -70,9 +70,9 @@ for (run in 1:n_runs) {
   unique_variants <- sort(unique(unlist(averaged_samples))) # store unique variants across all bins
   
   # Trait matrix to frequency matrix (row = bins, col = variants)
-  freq_mat <- t(sapply(averaged_samples, function(traits) {
-    tab <- table(factor(traits, levels = unique_variants))
-    as.numeric(tab) / length(traits)  # Proportions relative to N * time_window
+  freq_mat <- t(sapply(averaged_samples, function(variants) {
+    tab <- table(factor(variants, levels = unique_variants))
+    as.numeric(tab) / length(variants)  # Proportions relative to N * time_window
   }))
   colnames(freq_mat) <- unique_variants
   
@@ -121,14 +121,14 @@ for (run in 1:n_runs) {
   # Store metrics
   total_variants <- nrow(fit_results)
   FPR <- sum(fit_results$sig == "selection") / total_variants  # False positives
-  TNR <- sum(fit_results$sig == "neutral") / total_variants     # True negatives
+  NDR <- sum(fit_results$sig == "neutral") / total_variants     # True negatives
   
-  accuracy_ta[run] <- TNR  # track TNR across runs
+  accuracy_ta[run] <- NDR  # track NDR across runs
 }
 
 # Check results
 FPR
-TNR
+NDR
 accuracy_ta[70] # we can check each run individually
 overall_accuracy <- mean(accuracy_ta, na.rm = TRUE) # mean accuracy across runs
 overall_accuracy
@@ -140,27 +140,29 @@ high_accuracy_runs
 
 # Proportion of NA from the simulation
 sumNA <- sum(fit_results$sig == "NA")
-sumNEUTRAL <- sum(fit_results$sig == "neutral")
-percentageNA <- sumNA/sumNEUTRAL * 100
-percentageNA
+sumNA
+proportionNA <- sumNA/length(fit_results$sig)*100
+proportionNA
 
 # PLOTS --------------------------------------------
 
-# Plot distribution of TNR, marking the 95% threshold
-plot_neutral_ta <- ggplot(data.frame(TNR = accuracy_ta), aes(x = TNR)) +
+# Plot distribution of NDR, marking the 95% threshold
+plot_neutral_ta <- ggplot(data.frame(NDR = accuracy_ta), aes(x = NDR)) +
   geom_histogram(binwidth = 0.002, fill = "skyblue", color = "black") +
   geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
   labs(title = "Neutral Detection Rate (NDR) Across Runs 'Time Averaged' Model", 
-       subtitle = "Red line = expected TNR (1 - α)", 
-       x = "True Neutral Rate", 
+       subtitle = "Red line = expected NDR (1 - α)", 
+       x = "Neutral Detection Rate", 
        y = "Frequency",
        caption = paste("Mean =", round(mean(accuracy_ta), 3), "|", 
                        "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
                        "Number of runs =", n_runs, "|",
-                       "% NA =", round(percentageNA, 2), "%")) +
+                       "% NA =", round(proportionNA, 2), "%")) +
   theme_minimal()
 
-grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
 plot_neutral_ta
+
+grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
+
 
 

@@ -103,3 +103,24 @@ plot_neutral_ta <- ggplot(data.frame(TNR = accuracy_ta), aes(x = TNR)) +
     pivot_longer(-time, names_to="variant", values_to="freq") %>% # long format
     filter(freq > 0) %>% # remove zeros
     mutate(variant = as.integer(variant))
+
+# Slightly modified the ggplot function:
+plot_neutral_ta <- ggplot(data.frame(NDR = accuracy_ta), aes(x = NDR)) +
+  geom_histogram(binwidth = 0.002, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
+  labs(title = "Neutral Detection Rate (NDR) Across Runs 'Time Averaged' Model", 
+       subtitle = "Red line = expected NDR (1 - α)", 
+       x = "Neutral Detection Rate", 
+       y = "Frequency",
+       caption = paste("Mean =", round(mean(accuracy_ta), 3), "|", 
+                       "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
+                       "Number of runs =", n_runs, "|",
+                       "% NA =", round(proportionNA, 2), "%")) +
+  theme_minimal()
+ 
+ # And the "traits" for "variants" in the freq_mat (pipeline, 161-172):
+  freq_mat <- t(sapply(averaged_samples, function(variants) {
+    tab <- table(factor(variants, levels = unique_variants))
+    as.numeric(tab) / length(variants)  # Proportions relative to N * time_window
+  }))
+  colnames(freq_mat) <- unique_variants

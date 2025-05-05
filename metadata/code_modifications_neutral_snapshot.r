@@ -91,3 +91,16 @@ plot_neutral_snapshot <- ggplot(data.frame(TNR = accuracy_snapshot), aes(x = TNR
                        "% NA =", round(percentageNA, 2), "%")) +
   theme_minimal()
 
+# Slightly modified the ggplot function, from TNR to NDR:
+plot_neutral_snapshot <- ggplot(data.frame(NDR = accuracy_snapshot), aes(x = NDR)) +
+  geom_histogram(binwidth = 0.005, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0.95, linetype = "dashed", color = "red", linewidth = 1) +
+  labs(title = "Neutral Detection Rate (NDR) Across Runs 'Snapshot' Model", 
+       subtitle = "Red line = expected NDR (1 - α)", 
+       x = "Neutral Detection Rate", 
+       y = "Frequency",
+       caption = paste("Average =", round(mean(accuracy_snapshot), 3), "|", 
+                       "Runs ≥ 95% =", round(high_accuracy_runs, 1), "%", "|",
+                       "Number of runs =", n_runs, "|",
+                       "% NA =", round(percentageNA, 2), "%")) +
+  theme_minimal()
