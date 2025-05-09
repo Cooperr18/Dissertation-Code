@@ -11,7 +11,7 @@ set.seed(1234)
 
 # Parameters --------
 N <- 100 # Number of individuals
-mu <- 0.2 # innovation rate (numeric, between 0 and 1, inclusive)
+mu <- 0.02 # innovation rate (numeric, between 0 and 1, inclusive)
 burnin <- 1000 # number of initial steps (iterations) discarded
 timesteps <- 1000 # actual number of time steps or "generations" after the burn-in
 p_value_lvl <- 0.05 # Significance level
@@ -164,5 +164,31 @@ plot_neutral_ta
 
 grid.arrange(plot_neutral_snapshot,plot_neutral_ta,ncol=1)
 
+# P-value distribution
+hist_data <- hist(fit_results$fit_p, breaks = seq(0, 1, by = 0.025), plot = FALSE)
+y_max <- max(hist_data$counts)
+
+p_value_distribution_ta <- ggplot(data = fit_results, aes(x = fit_p)) +
+  geom_histogram(binwidth = 0.025, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0.05, linetype = "dashed", color = "red", linewidth = 1) +
+  annotate("text", x = 0.075, y = 5, label = "Neutrality", 
+           color = "red", size = 3.5, fontface = "bold", hjust = 0) +
+  labs(
+    title = "P-value Distribution Across Runs 'Time Averaging Model'",
+    subtitle = paste("µ =", mu, "| N =", N, "| timesteps =", timesteps, "| burnin =", burnin),
+    x = "P-value",
+    y = "Counts",
+    caption = paste(
+      "Average =", round(mean(fit_results$fit_p, na.rm = TRUE), 3), "|",
+      "Number of runs =", n_runs, "|",
+      "% NA =", round(proportionNA, 2), "%"
+    )
+  ) +
+  coord_cartesian(clip = "off") +  # allows text to overflow if needed
+  theme_minimal()
+
+p_value_distribution_ta
+
+grid.arrange(p_value_distribution_snapshot, p_value_distribution_ta, ncol = 1)
 
 

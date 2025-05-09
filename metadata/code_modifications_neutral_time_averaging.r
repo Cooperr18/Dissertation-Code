@@ -124,3 +124,27 @@ plot_neutral_ta <- ggplot(data.frame(NDR = accuracy_ta), aes(x = NDR)) +
     as.numeric(tab) / length(variants)  # Proportions relative to N * time_window
   }))
   colnames(freq_mat) <- unique_variants
+  
+# Added a new plot showing p-value distribution
+p_value_distribution_ta <- ggplot(data = fit_results, aes(x = fit_p)) +
+  geom_histogram(binwidth = 0.025, fill = "skyblue", color = "black") +
+  geom_vline(xintercept = 0.05, linetype = "dashed", color = "red", linewidth = 1) +
+  annotate("text", x = 0.075, y = 5, label = "Neutrality", 
+           color = "red", size = 3.5, fontface = "bold", hjust = 0) +
+  labs(
+    title = "P-value Distribution Across Runs 'Time Averaging Model'",
+    subtitle = paste("µ =", mu, "| N =", N, "| timesteps =", timesteps, "| burnin =", burnin),
+    x = "P-value",
+    y = "Counts",
+    caption = paste(
+      "Average =", round(mean(fit_results$fit_p, na.rm = TRUE), 3), "|",
+      "Number of runs =", n_runs, "|",
+      "% NA =", round(proportionNA, 2), "%"
+    )
+  ) +
+  coord_cartesian(clip = "off") +  # allows text to overflow if needed
+  theme_minimal()
+
+p_value_distribution_ta
+
+grid.arrange(p_value_distribution_snapshot, p_value_distribution_ta, ncol = 1)
