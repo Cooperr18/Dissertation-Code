@@ -6,8 +6,156 @@ library(ggplot2)
 library(tidyr)
 library(gridExtra)
 library(purrr)
+library(here)
+library(tidyverse)
+
+pkgbuild::check_build_tools(debug = TRUE)
+pak::pkg_install("benmarwick/evoarchdata")
+library(evoarchdata)
+data("ceramics_lbk_merzbach")
+ceramics_lbk_merzbach
+
 
 set.seed(1234)
+
+# FIT --------------------------------
+# Input
+decoration_types <- 
+  names(ceramics_lbk_merzbach)[-1] %>%
+  enframe() %>% 
+  separate(value, into = c('a', 'b'), 2) %>% 
+  mutate(b = parse_number(b)) %>% 
+  arrange(b) %>% 
+  unite(decorations, c(a,b), sep = "") %>% 
+  pull(decorations)
+
+ceramics_lbk_merzbach_long <-
+  ceramics_lbk_merzbach %>%
+  gather(variable, value, -Phase) %>% 
+  mutate(Phase = fct_relevel(Phase, ceramics_lbk_merzbach$Phase)) %>% 
+  mutate(variable = fct_relevel(variable, decoration_types))
+
+# plot
+ggplot(ceramics_lbk_merzbach_long,
+       aes(Phase,
+           value)) +
+  geom_line(aes(group = 1)) +
+  geom_point() +
+  facet_wrap(~variable,
+             scales = "free_y") +
+  theme_minimal(base_size = 8) +
+  ggtitle(str_glue('Ceramic decoration frequency data from Merzbach, Germany'))
+
+max_n <- 50
+ceramics_lbk_merzbach_long_subset <-
+  ceramics_lbk_merzbach_long %>% 
+  group_by(variable) %>% 
+  filter(max(value) > max_n)
+
+# keep these decorations
+decorations_to_keep <- unique(as.character(ceramics_lbk_merzbach_long_subset$variable))
+
+# plot
+ggplot(ceramics_lbk_merzbach_long_subset,
+       aes(Phase, value)) +
+  geom_line(aes(group = 1)) +
+  geom_point() +
+  facet_wrap(~variable, scales = "fixed") +
+  labs(x = "Phase/Time Series", y = "Frequency") +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    strip.text = element_text(size = 14)  # facet labels
+  )
+
+
+
+ceramics_lbk_merzbach_prop <- 
+  ceramics_lbk_merzbach %>% 
+  select(Phase, decorations_to_keep)
+
+df <- ceramics_lbk_merzbach_prop[ , 2:ncol(ceramics_lbk_merzbach_prop)]
+time <- utils:::.roman2numeric(ceramics_lbk_merzbach_prop$Phase)
+
+list_of_dfs <- vector("list", ncol(df))
+names(list_of_dfs) <- names(df)
+
+for(i in 1:ncol(df)){
+  tmp <-
+    data.frame(time = time,
+               count_this_one = df[[i]],
+               count_others = rowSums(df[, (seq_len(ncol(df)))[-i]   ]))
+  
+  tmp$frequency = with(tmp, count_this_one / count_others)
+  
+  # collect results and exclude rows with zero counts for this type i
+  list_of_dfs[[i]] <- tmp[which(tmp$count_this_one != 0 ), ]
+}
+
+# we need a min of three time points to compute the FIT, so drop decoration types with less than 3
+list_of_dfs_three_or_more <- 
+  keep(list_of_dfs, ~nrow(.x) >= 3)
+
+fit_safely <- 
+  safely(fit, 
+         otherwise = data.frame(fit_stat = NA,
+                                fit_p = NA))
+
+df_fit_test_results <-
+  list_of_dfs_three_or_more %>%
+  bind_rows(.id = "type") %>%
+  nest(data = -type) %>%
+  mutate(fit_test = map(data,
+                        ~fit_safely(time = .x$time,
+                                    v =    .x$frequency))) %>%
+  mutate(fit_p = map(fit_test, ~.x$result %>% bind_rows)) %>%
+  unnest(fit_p) %>%
+  mutate(sig = ifelse(fit_p <= 0.05, "selection", "neutral"))
+
+ceramics_lbk_merzbach_long_sig <-
+  ceramics_lbk_merzbach_long_subset %>%
+  ungroup %>% 
+  left_join(df_fit_test_results %>% 
+              select(type, sig), by = c("variable" = "type")) %>%
+  mutate(Phase_num = utils:::.roman2numeric(as.character(Phase))) %>% 
+  mutate(variable = fct_relevel(factor(variable, levels = decoration_types))) %>% 
+  arrange(variable, Phase_num)
+
+ggplot(ceramics_lbk_merzbach_long_sig,
+       aes(Phase_num,
+           value,
+           colour = sig,
+           shape = sig,
+           group = variable)) +
+  geom_point(size = 3) +
+  scale_color_viridis_d(name = "", 
+                        begin = 0.25, 
+                        end = 0.75) +
+  geom_line() +
+  facet_wrap(~variable,
+             scales = "free_y") +
+  guides(shape = FALSE) +
+  theme_minimal(base_size = 8) +
+  ggtitle(str_glue('Application of the FIT to decoration frequency data from Merzbach.'))
+
+# Define decoration types you want in the table
+variants_for_table <- c("BT1", "BT2", "BT3", "BT8", "BT10", "BT13", "BT19", "BT20", "BT24")
+
+# Filter the FIT results to include only those variants
+fit_results_table <- df_fit_test_results %>%
+  filter(type %in% variants_for_table) %>%
+  select(Decoration_Type = type,
+         FIT_Statistic = fit_stat,
+         FIT_p_value = fit_p,
+         Inference = sig)
+
+# View in R
+print(fit_results_table)
+
+# Optional: Export to CSV for PowerPoint use
+write.csv(fit_results_table, "fit_test_results_table.csv", row.names = FALSE)
+
 
 # Parameters --------
 N_pres <- 50 # Number of individuals
@@ -15,7 +163,7 @@ mu_pres <- 0.02 # innovation rate (numeric, between 0 and 1, inclusive)
 burnin_pres <- 1000 # number of initial steps (iterations) discarded
 timesteps_pres <- 1000 # actual number of time steps or "generations" after the burn-in
 p_value_lvl_pres <- 0.05 # Significance level
-n_runs_pres <- 500 # number of test runs
+n_runs_pres <- 100 # number of test runs
 
 time_window_pres <- 20 # size of averaging windows
 
@@ -304,6 +452,8 @@ sumNA_pres <- sum(fit_results$sig == "NA")
 sumNA_pres
 proportionNA_pres <- sumNA_pres/length(fit_results$sig)*100
 proportionNA_pres
+
+
 
 
 

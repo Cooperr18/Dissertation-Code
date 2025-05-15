@@ -137,7 +137,7 @@ p_value_distribution_ta <- ggplot(data = fit_results, aes(x = fit_p)) +
     x = "P-value",
     y = "Counts",
     caption = paste(
-      "Average =", round(mean(fit_results$fit_p, na.rm = TRUE), 3), "|",
+      "Mean =", round(mean(fit_results$fit_p, na.rm = TRUE), 3), "|",
       "Number of runs =", n_runs, "|",
       "% NA =", round(proportionNA, 2), "%"
     )
