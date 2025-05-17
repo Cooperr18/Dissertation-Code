@@ -301,3 +301,68 @@ p_value_distr_snap <- function(n_snap_sim, binwidth = 0.025) {
 }
 
 p_value_distr_snap(n_snap_sim)
+
+# Additions 17/05/25
+
+fit_p_count <- vector("list", n_runs) # store p-values
+
+fit_p_count[[run]] <- fit_results$fit_p  # store all the p-values from this run
+
+
+if(total_variants == 0) { # if no variants survive NA is returned
+    FPR <- NA; NDR <- NA
+  }
+
+
+all_pvals   <- unlist(fit_p_count) # list of p-values
+
+# Proportion of NA from the simulation
+sumNA <- sum(is.na(all_pvals))
+sumNA
+proportionNA <- sumNA / length(all_pvals) * 100
+proportionNA
+if(sumNA == 0) {
+    proportionNA <- 0
+  }
+
+# P-values across runs
+mean_p_value <- mean(all_pvals, na.rm = T)
+mean_p_value
+
+# Store output across runs in a table
+results_table_neutral_snapshot <- tibble(
+  N  = n_snap_sim$N,
+  mu = n_snap_sim$mu,
+  burnin = n_snap_sim$burnin,
+  timesteps = n_snap_sim$timesteps,
+  p_value_lvl = n_snap_sim$p_value_lvl,
+  n_runs = n_snap_sim$n_runs,
+  mean_accuracy = n_snap_sim$mean_accuracy,
+  high_accuracy_runs = n_snap_sim$high_accuracy_runs,
+  proportionNA = n_snap_sim$proportionNA,
+  mean_p_value = mean(n_snap_sim$all_pvals, na.rm = TRUE)
+)
+results_table_neutral_snapshot
+
+# Run many parameter-sets and stack the results
+params_neutral_snapshot <- list(
+  list(N=100, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=200, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10)
+)
+
+all_results_neutral_snapshot <- map_dfr(params_neutral_snapshot, ~ {
+  sim <- do.call(neutral_snapshot, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         p_value_lvl = .x$p_value_lvl,
+         n_runs = .x$n_runs,
+         mean_accuracy = sim$mean_accuracy,
+         high_accuracy_runs = sim$high_accuracy_runs,
+         proportionNA = sim$proportionNA,
+         mean_p_value = mean(sim$all_pvals, na.rm = TRUE)
+  )
+})
+
+print(all_results_neutral_snapshot)

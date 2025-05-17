@@ -148,3 +148,70 @@ p_value_distribution_ta <- ggplot(data = fit_results, aes(x = fit_p)) +
 p_value_distribution_ta
 
 grid.arrange(p_value_distribution_snapshot, p_value_distribution_ta, ncol = 1)
+
+# Additions 17/05/25
+
+fit_p_count <- vector("list", n_runs) # store p-values
+
+fit_p_count[[run]] <- fit_results$fit_p  # store all the p-values from this run
+
+
+if(total_variants == 0) { # if no variants survive NA is returned
+    FPR <- NA; NDR <- NA
+  }
+
+
+all_pvals   <- unlist(fit_p_count) # list of p-values
+
+# Proportion of NA from the simulation
+sumNA <- sum(is.na(all_pvals))
+sumNA
+proportionNA <- sumNA / length(all_pvals) * 100
+proportionNA
+if(sumNA == 0) {
+    proportionNA <- 0
+  }
+
+# P-values across runs
+mean_p_value <- mean(all_pvals, na.rm = T)
+mean_p_value
+
+# Store output across runs in a table
+results_table_neutral_ta <- tibble(
+  N  = n_ta_sim$N,
+  mu = n_ta_sim$mu,
+  burnin = n_ta_sim$burnin,
+  timesteps = n_ta_sim$timesteps,
+  p_value_lvl = n_ta_sim$p_value_lvl,
+  n_runs = n_ta_sim$n_runs,
+  time_window = n_ta_sim$time_window,
+  mean_accuracy = n_ta_sim$mean_accuracy,
+  high_accuracy_runs = n_ta_sim$high_accuracy_runs,
+  proportionNA = n_ta_sim$proportionNA,
+  mean_p_value = mean(n_ta_sim$all_pvals, na.rm = TRUE)
+)
+results_table_neutral_ta
+
+# Run many parameter-sets and stack the results
+params_neutral_ta <- list(
+  list(N=100, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10, time_window = 20),
+  list(N=100, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10, time_window = 30)
+)
+
+all_results_neutral_ta <- map_dfr(params_neutral_ta, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         p_value_lvl = .x$p_value_lvl,
+         n_runs = .x$n_runs,
+         time_window = .x$time_window
+         mean_accuracy = sim$mean_accuracy,
+         high_accuracy_runs = sim$high_accuracy_runs,
+         proportionNA = sim$proportionNA,
+         mean_p_value = mean(sim$all_pvals, na.rm = TRUE)
+  )
+})
+
+print(all_results_neutral_ta)
