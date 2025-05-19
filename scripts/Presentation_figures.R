@@ -70,10 +70,10 @@ ggplot(ceramics_lbk_merzbach_long_subset,
   )
 
 
-
 ceramics_lbk_merzbach_prop <- 
   ceramics_lbk_merzbach %>% 
-  select(Phase, decorations_to_keep)
+  select(Phase, all_of(decorations_to_keep))
+
 
 df <- ceramics_lbk_merzbach_prop[ , 2:ncol(ceramics_lbk_merzbach_prop)]
 time <- utils:::.roman2numeric(ceramics_lbk_merzbach_prop$Phase)
@@ -152,9 +152,6 @@ fit_results_table <- df_fit_test_results %>%
 
 # View in R
 print(fit_results_table)
-
-# Optional: Export to CSV for PowerPoint use
-write.csv(fit_results_table, "fit_test_results_table.csv", row.names = FALSE)
 
 
 # Parameters --------
