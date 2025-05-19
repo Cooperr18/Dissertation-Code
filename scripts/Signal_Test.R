@@ -202,7 +202,6 @@ decoration_types_tsinfer_output <-
 decoration_types_tsinfer_output
 
 decoration_types_tsinfer_output <- 
-  # 1) volver a crear la tabla con tsinfer()
   list_of_dfs_three_or_more %>% 
   purrr::map_dfr(
     ~ tsinfer(
@@ -213,63 +212,61 @@ decoration_types_tsinfer_output <-
     ),
     .id = "type"
   ) %>% 
-  # 2) unir el p-value y la etiqueta 'sig' de df_fit_test_results
   left_join(
     df_fit_test_results %>% 
       select(type, fit_p, sig),
     by = "type"
   ) %>% 
-  # 3) renombrar para mayor claridad
+  # Rename
   rename(
     p_value       = fit_p,
     inference_tag = sig
   )
 
-# Mira el resultado
+# Print result
 print(decoration_types_tsinfer_output)
 
+# Add p-value and inference
+decoration_types_tsinfer_selected <- 
+  decoration_types_tsinfer_output %>%
+  select(
+    type, 
+    s, 
+    f0, 
+    LL, 
+    p_value,        
+    inference_tag
+  )
+
+# Print table
+print(decoration_types_tsinfer_selected)
+
+# Install packages
+
+install.packages(c("officer", "flextable"))
+
+library(officer)
+library(flextable)
+
+# flextable from data
+ft <- flextable(decoration_types_tsinfer_selected)
+ft <- theme_vanilla(ft) %>%
+  autofit()
+
+# Table to Word
+doc <- read_docx() %>%
+  body_add_par("Results of FIT Analysis for Decoration Types", style = "heading 1") %>%
+  body_add_flextable(ft) 
+
+# save in directoru
+print(doc, target = "decoration_types_tsinfer_results.docx")
 
 
-library(viridis)   # for scale_color_viridis_d()
+# Visualize by Relative frequencies
+library(viridis)
 library(stringr)
 
-ggplot(
-  data = ceramics_lbk_merzbach_long_sig_to_plot_with_others,
-  aes(
-    x     = time,
-    y     = count_this_one,
-    group = type,
-    colour = type     # map colour to the variant ("type")
-  )
-) +
-  geom_line(size = 1) +
-  geom_point(
-    aes(shape = sig),  # still use shape to show selection vs. neutral
-    size = 2
-  ) +
-  scale_color_viridis_d(
-    name  = "Decoration\nVariant",
-    begin = 0.25,
-    end   = 0.75
-  ) +
-  scale_shape_manual(
-    name = "Inference",
-    values = c(selection = 16, neutral = 17)
-  ) +
-  guides(
-    colour = guide_legend(order = 1),
-    shape  = guide_legend(order = 2)
-  ) +
-  theme_minimal(base_size = 8) +
-  labs(
-    title = str_glue(
-      "Application of the FIT to decoration frequency data from Merzbach\n",
-      "All variants on a common axis, coloured by variant"
-    ),
-    x = "Time series",
-    y = "Number of counts"
-  )
-
+# Convert frequencies
 df_rel <- ceramics_lbk_merzbach_long_sig_to_plot_with_others %>%
   group_by(time) %>% 
   mutate(
@@ -278,27 +275,27 @@ df_rel <- ceramics_lbk_merzbach_long_sig_to_plot_with_others %>%
   ) %>% 
   ungroup()
 
-
-# 2. Graficar frecuencias relativas
-ggplot(df_rel,
-       aes(x = time,
-           y = frequency,
-           group = type,
-           colour = type)) +
-  geom_line(size = 1) +
-  geom_point(aes(shape = sig), size = 2) +
-  scale_color_viridis_d(
-    name  = "Decoration\nVariant",
+ggplot(df_rel, aes(
+  x      = time,
+  y      = frequency,
+  group  = type,
+  shape  = type,    # variant different shapes
+  colour = sig      # inference by colour
+)) +
+  geom_line(aes(colour = sig), size = 1) +  # variants by colour
+  geom_point(size = 3) +                    # points by variant
+  scale_shape_manual(
+    name   = "Decoration\nVariant",
+    values = seq_along(unique(df_rel$type))  # different shapes
+  ) +
+  scale_colour_viridis_d(
+    name  = "Inference",
     begin = 0.25,
     end   = 0.75
   ) +
-  scale_shape_manual(
-    name   = "Inference",
-    values = c(selection = 16, neutral = 17)
-  ) +
   guides(
-    colour = guide_legend(order = 1),
-    shape  = guide_legend(order = 2)
+    shape  = guide_legend(order = 1),
+    colour = guide_legend(order = 2)
   ) +
   theme_minimal(base_size = 8) +
   labs(
@@ -309,3 +306,4 @@ ggplot(df_rel,
     x = "Time series",
     y = "Relative frequency"
   )
+
