@@ -10,6 +10,7 @@ library(tidyr)
 library(gridExtra)
 library(purrr)
 library(tibble)
+library(writexl)
 
 # Standard pipeline -------
 
@@ -369,8 +370,15 @@ results_table_neutral_snapshot
 
 # Run many parameter-sets and stack the results
 params_neutral_snapshot <- list(
-  list(N=100, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=200, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10)
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.05, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.075, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.1, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.125, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.15, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.175, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10)
 )
 
 all_results_neutral_snapshot <- map_dfr(params_neutral_snapshot, ~ {
@@ -381,14 +389,16 @@ all_results_neutral_snapshot <- map_dfr(params_neutral_snapshot, ~ {
          timesteps = .x$timesteps,
          p_value_lvl = .x$p_value_lvl,
          n_runs = .x$n_runs,
-         mean_accuracy = sim$mean_accuracy,
-         high_accuracy_runs = sim$high_accuracy_runs,
-         proportionNA = sim$proportionNA,
-         mean_p_value = mean(sim$all_pvals, na.rm = TRUE)
+         mean_accuracy = round(sim$mean_accuracy, 3),
+         proportionNA = round(sim$proportionNA, 2),
+         mean_p_value = round(mean(sim$all_pvals, na.rm = TRUE), 3)
   )
 })
-
 print(all_results_neutral_snapshot)
+
+# Export table
+write_xlsx(all_results_neutral_snapshot, "neutral_snapshot_results.xlsx")
+
 
 
 # PLOTS ----

@@ -7,6 +7,7 @@ library(tidyr)
 library(gridExtra)
 library(purrr)
 library(tibble)
+library(writexl)
 
 # Standard pipeline -------
 
@@ -382,8 +383,15 @@ results_table_neutral_ta
 
 # Run many parameter-sets and stack the results
 params_neutral_ta <- list(
-  list(N=100, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10, time_window = 20),
-  list(N=100, mu=0.02, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10, time_window = 30)
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.05, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.075, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.1, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.125, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.15, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.175, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20)
 )
 
 all_results_neutral_ta <- map_dfr(params_neutral_ta, ~ {
@@ -394,15 +402,17 @@ all_results_neutral_ta <- map_dfr(params_neutral_ta, ~ {
          timesteps = .x$timesteps,
          p_value_lvl = .x$p_value_lvl,
          n_runs = .x$n_runs,
-         time_window = .x$time_window
-         mean_accuracy = sim$mean_accuracy,
-         high_accuracy_runs = sim$high_accuracy_runs,
-         proportionNA = sim$proportionNA,
-         mean_p_value = mean(sim$all_pvals, na.rm = TRUE)
+         time_window = .x$time_window,
+         mean_accuracy = round(sim$mean_accuracy, 3),
+         proportionNA = round(sim$proportionNA, 2),
+         mean_p_value = round(mean(sim$all_pvals, na.rm = TRUE), 3)
   )
 })
 
 print(all_results_neutral_ta)
+
+write_xlsx(all_results_neutral_snapshot, "neutral_ta_results.xlsx")
+
 
 # PLOTS ----
 
