@@ -3,14 +3,13 @@
 install.packages("pak")
 pak::pkg_install("benmarwick/signatselect")
 
-library(signatselect)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-library(gridExtra)
-library(purrr)
-library(tibble)
-library(writexl)
+pkgs <- c(
+  "signatselect","dplyr","ggplot2",
+  "tidyr","gridExtra","purrr",
+  "tibble","writexl"
+)
+lapply(pkgs, library, character.only = TRUE)
+
 
 # Standard pipeline -------
 
@@ -212,7 +211,7 @@ p_value_distribution_snapshot
 set.seed(1234)
 
 neutral_snapshot <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs) {
-
+(sig)
   accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each run 
   fit_p_count <- vector("list", n_runs) # store p-values
   

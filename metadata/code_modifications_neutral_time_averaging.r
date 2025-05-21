@@ -215,3 +215,36 @@ all_results_neutral_ta <- map_dfr(params_neutral_ta, ~ {
 })
 
 print(all_results_neutral_ta)
+
+# Multiple innovation rates (20/05):
+params_neutral_ta <- list(
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.05, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.075, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.1, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.125, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.15, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.175, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20)
+)
+
+all_results_neutral_ta <- map_dfr(params_neutral_ta, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         p_value_lvl = .x$p_value_lvl,
+         n_runs = .x$n_runs,
+         time_window = .x$time_window,
+         mean_accuracy = round(sim$mean_accuracy, 3),
+         proportionNA = round(sim$proportionNA, 2),
+         mean_p_value = round(mean(sim$all_pvals, na.rm = TRUE), 3)
+  )
+})
+
+print(all_results_neutral_ta)
+
+write_xlsx(all_results_neutral_snapshot, "neutral_ta_results.xlsx")
+

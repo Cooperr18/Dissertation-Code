@@ -1,13 +1,12 @@
 # UNBIASED TRANSMISSION "TIME AVERAGED" VERSION ----------------------------------
 
-library(signatselect)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-library(gridExtra)
-library(purrr)
-library(tibble)
-library(writexl)
+pkgs <- c(
+  "signatselect","dplyr","ggplot2",
+  "tidyr","gridExtra","purrr",
+  "tibble","writexl"
+)
+lapply(pkgs, library, character.only = TRUE)
+
 
 # Standard pipeline -------
 
