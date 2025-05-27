@@ -1,4 +1,4 @@
-################### CONTENT BIAS TIME AVERAGING ###################
+################### CONTENT BIAS SNAPSHOT ###################
 
 pkgs <- c(
   "signatselect","dplyr","ggplot2",
