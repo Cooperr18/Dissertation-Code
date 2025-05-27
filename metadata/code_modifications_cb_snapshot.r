@@ -61,3 +61,28 @@ this_fit <- fit_results %>%
   FNR <- neut / (n_runs - sumNA)
   proportionNA <- sumNA / n_runs
   all_pvals <- unlist(fit_p_count)
+
+# Focal variant problem 26-27/05/25
+# SSR unbiased
+pop_counts <- table(pop)
+    viable <- as.integer(names(pop_counts[pop_counts>=3]))
+    if (length(viable)==0) next
+    foc_variant_snap <- sample(viable, 1)
+	
+# SSR modal
+pop_counts <- table(pop)
+    count_max <- max(pop_counts)
+    if (count_max < 3) next
+    foc_variant_snap <- as.integer(names(pop_counts[which.max(pop_counts)]))
+	
+# Hard coding focal variant:
+# Assign selected variant
+  sel_variant_snap <- 400  # we choose the focal variant
+  
+  # Table to store results for the focal variant 
+  results_snap <- tibble(
+    run = seq_len(n_runs),
+    variant = rep(sel_variant_snap, n_runs), # number of variant
+    fit_p = rep(NA_real_, n_runs), # default NA
+    inference = rep(NA_character_, n_runs) # default NA character
+  )

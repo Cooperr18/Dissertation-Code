@@ -248,3 +248,12 @@ print(all_results_neutral_ta)
 
 write_xlsx(all_results_neutral_snapshot, "neutral_ta_results.xlsx")
 
+
+# FOCAL VARIANT PROBLEM SOLUTION 26/05/25
+# Record the focal variant as the modal at equilibrium
+    pop_counts <- table(pop)
+    foc_variant_snap <- as.integer(names(pop_counts)[which.max(pop_counts)])
+    
+    # Store the focal variant
+    results_snap$variant[run] <- foc_variant_snap
+
