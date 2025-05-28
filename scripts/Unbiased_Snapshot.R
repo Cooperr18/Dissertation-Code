@@ -1,8 +1,12 @@
-# UNBIASED TRANSMISSION "SNAPSHOT" VERSION ----------------------------------
+#########################################################
+################### UNBIASED SNAPSHOT ###################
+#########################################################
 
+# Install signatselect
 install.packages("pak")
 pak::pkg_install("benmarwick/signatselect")
 
+# Read packages
 pkgs <- c(
   "signatselect","dplyr","ggplot2",
   "tidyr","gridExtra","purrr",
@@ -207,11 +211,11 @@ p_value_distribution_snapshot <- ggplot(data = fit_results, aes(x = fit_p)) +
 p_value_distribution_snapshot
 
 
-# Function attempt --------------------
+# Pipeline as a function ---------------
 set.seed(1234)
 
 neutral_snapshot <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs) {
-(sig)
+  
   accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each run 
   fit_p_count <- vector("list", n_runs) # store p-values
   

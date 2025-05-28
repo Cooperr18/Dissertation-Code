@@ -1,5 +1,8 @@
-# UNBIASED TRANSMISSION "TIME AVERAGED" VERSION ----------------------------------
+#########################################################
+################ UNBIASED TIME AVERAGING ################
+#########################################################
 
+# Read packages
 pkgs <- c(
   "signatselect","dplyr","ggplot2",
   "tidyr","gridExtra","purrr",
@@ -205,7 +208,7 @@ sum(fit_results$fit_p > 0.90, na.rm = T)
 
 
 
-# Function attempt ------------------------------
+# Pipeline as a function ------------------------------
 set.seed(1234)
 
 neutral_ta <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs, time_window) {
