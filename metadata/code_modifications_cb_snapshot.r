@@ -76,7 +76,6 @@ pop_counts <- table(pop)
     foc_variant_snap <- as.integer(names(pop_counts[which.max(pop_counts)]))
 	
 # Hard coding focal variant:
-# Assign selected variant
   sel_variant_snap <- 400  # we choose the focal variant
   
   # Table to store results for the focal variant 
