@@ -204,7 +204,9 @@ results_table_neutral_ta <- tibble(
 results_table_neutral_ta
 
 # Run many parameter-sets and stack the results
-params_neutral_ta <- list(
+
+# Innovation rate ------------
+n_ta_mu_params <- list(
   list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
   list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
   list(N=100, mu=0.05, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
@@ -216,24 +218,74 @@ params_neutral_ta <- list(
   list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20)
 )
 
-all_results_neutral_ta <- map_dfr(params_neutral_ta, ~ {
-  sim <- do.call(neutral_ta, args = .x)
+# Population size --------------
+n_ta_N_params <- list(
+  list(N=10, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=50, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=150, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=200, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=250, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=300, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=350, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=400, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20)
+)
+
+# Time series -----------
+n_ta_time_params <- list(
+  list(N=100, mu=0.01, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=200, timesteps=200, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=500, timesteps=500, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=750, timesteps=750, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=1500, timesteps=1500, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=2000, timesteps=2000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=2500, timesteps=2500, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=3000, timesteps=3000, p_value_lvl=0.05, n_runs=100, time_window = 20)
+)
+
+# Time window size ---------------
+n_ta_time_params <- list(
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 5),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 10),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 40),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 50),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 70),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 80),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 100),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 200)
+)
+
+# Run and store ----
+n_ta_time_results <- map_dfr(n_ta_time_params, ~ {
+  sim <- do.call(neutral_snapshot, args = .x)
   tibble(N  = .x$N,
          mu = .x$mu,
          burnin = .x$burnin,
          timesteps = .x$timesteps,
-         p_value_lvl = .x$p_value_lvl,
-         n_runs = .x$n_runs,
-         time_window = .x$time_window,
-         mean_accuracy = round(sim$mean_accuracy, 3),
-         proportionNA = round(sim$proportionNA, 2),
-         mean_p_value = round(mean(sim$all_pvals, na.rm = TRUE), 3)
+         "Time window size" = .x$time_window
+         "α" = .x$p_value_lvl,
+         "Runs" = .x$n_runs,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Mean p-value" = round(mean(sim$all_pvals, na.rm = TRUE), 3)
   )
 })
 
-print(all_results_neutral_ta)
+print(n_ta_mu_results)
+print(n_ta_N_results)
+print(n_ta_time_results)
+print(n_ta_tw_results)
 
-write_xlsx(all_results_neutral_snapshot, "neutral_ta_results.xlsx")
+# Export results to an excel
+write_xlsx(n_ta_mu_results, "tables/n_ta_output/n_ta_mu_params.xlsx") # mu
+
+write_xlsx(n_ta_N_results, "tables/n_ta_output/n_ta_N_params.xlsx") # N
+
+write_xlsx(n_ta_time_results, "tables/n_ta_output/n_ta_time_params.xlsx") # time series
+
+write_xlsx(n_ta_tw_params, "tables/n_ta_output/n_ta_tw_params.xlsx") # time window size
 
 
 # PLOTS ----

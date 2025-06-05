@@ -188,35 +188,72 @@ results_table_neutral_snapshot <- tibble(
 results_table_neutral_snapshot
 
 # Run many parameter-sets and stack the results
-params_neutral_snapshot <- list(
-  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.05, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.075, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.1, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.125, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.15, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.175, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10),
-  list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=10)
+
+# Innovation rate ------------
+n_snap_mu_params <- list(
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.05, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.075, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.1, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.125, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.15, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.175, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100)
 )
 
-all_results_neutral_snapshot <- map_dfr(params_neutral_snapshot, ~ {
+# Population size --------------
+n_snap_N_params <- list(
+  list(N=10, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=50, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=150, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=200, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=250, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=300, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=350, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=400, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100)
+)
+
+# Time series -----------
+n_snap_time_params <- list(
+  list(N=100, mu=0.01, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=200, timesteps=200, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=500, timesteps=500, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=750, timesteps=750, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=1500, timesteps=1500, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=2000, timesteps=2000, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=2500, timesteps=2500, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, burnin=3000, timesteps=3000, p_value_lvl=0.05, n_runs=100)
+)
+
+
+# Run and store ----
+n_snap_time_results <- map_dfr(n_snap_time_params, ~ {
   sim <- do.call(neutral_snapshot, args = .x)
   tibble(N  = .x$N,
          mu = .x$mu,
          burnin = .x$burnin,
          timesteps = .x$timesteps,
-         p_value_lvl = .x$p_value_lvl,
-         n_runs = .x$n_runs,
-         mean_accuracy = round(sim$mean_accuracy, 3),
-         proportionNA = round(sim$proportionNA, 2),
-         mean_p_value = round(mean(sim$all_pvals, na.rm = TRUE), 3)
+         "α" = .x$p_value_lvl,
+         "Runs" = .x$n_runs,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Mean p-value" = round(mean(sim$all_pvals, na.rm = TRUE), 3)
   )
 })
-print(all_results_neutral_snapshot)
 
-# Export table
-write_xlsx(all_results_neutral_snapshot, "neutral_snapshot_results.xlsx")
+print(n_snap_mu_results)
+print(n_snap_N_results)
+print(n_snap_time_results)
+
+# Export results to an excel
+write_xlsx(n_snap_mu_results, "tables/n_snap_output/n_snap_mu_params.xlsx") # mu
+
+write_xlsx(n_snap_N_results, "tables/n_snap_output/n_snap_N_params.xlsx") # N
+
+write_xlsx(n_snap_time_params, "tables/n_snap_output/n_snap_time_params.xlsx") # time series
 
 
 
