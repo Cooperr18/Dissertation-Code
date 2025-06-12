@@ -85,3 +85,131 @@ pop_counts <- table(pop)
     fit_p = rep(NA_real_, n_runs), # default NA
     inference = rep(NA_character_, n_runs) # default NA character
   )
+  
+sel_variant_snap <- N + 1 # reserve this slot
+
+pop[1:inject_cnt] <- sel_variant_snap        
+    maxtrait         <- sel_variant_snap
+    traitmatrix[1, ] <- pop 
+    
+    # Observation period after equilibrium
+    for (i in 2:timesteps) {
+      
+      # apply content biased transmission
+      w <- ifelse(pop == sel_variant_snap, 1 + b, 1) # normalized weights
+      pop <- sample(pop,replace=T,prob = w) # add the weights as probabilities
+	  
+	  
+sample_times <- seq(1, timesteps, by = sample_int)
+n_samples    <- length(sample_times)
+
+# Observation period after equilibrium
+    sample_row <- 1 # start of sampling intervals
+    
+    for (i in 2:timesteps) {
+      
+      # apply content biased transmission
+      w <- ifelse(pop == sel_variant_snap, 1 + b, 1) # selected variant weighs 1 + s, neutral = 1
+      pop <- sample(pop,replace=T,prob = w) # add the weights as probabilities
+      
+      # Neutral innovation
+      innovate <- which(runif(N)<mu) 
+      if(length(innovate) > 0) {
+        new_variants <- (maxtrait + 1):(maxtrait + length(innovate))
+        pop[innovate] <- new_variants
+        maxtrait <- max(pop)
+      }
+      
+      if (i %in% sample_times) {
+        sample_row  <- sample_row + 1
+        traitmatrix[sample_row, ] <- pop
+      }
+    }
+	
+# Check results with one parameter setting:
+cb_snap_sim <- content_bias_snapshot(N=100, mu=0.01, b=0.5,
+                                     burnin=1000, timesteps=1000,
+                                     p_value_lvl=0.05, n_runs=100,
+                                     sample_int=50)
+									 
+# Multiple parameter settings:
+# Optimal sampling intervals
+osi_list <- list(
+  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
+       p_value_lvl=0.05, n_runs=50, sample_int = 1:200),
+  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
+       p_value_lvl=0.05, n_runs=50, sample_int = 201:400),
+  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
+       p_value_lvl=0.05, n_runs=50, sample_int = 401:600),
+  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
+       p_value_lvl=0.05, n_runs=50, sample_int = 601:800),
+  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
+       p_value_lvl=0.05, n_runs=50, sample_int = 801:1000)
+)
+
+# Run simulation for each sampling interval
+osi_result <- map_dfr(osi_list, ~ {
+  args <- .x
+  args$sample_int <- as.integer(args$sample_int)
+  sim <- do.call(content_bias_snapshot, args = args)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "α" = .x$p_value_lvl,
+         "Runs" = .x$n_runs,
+         "SSR" = round(sim$SSR, 3),
+         "FNR" = round(sim$FNR, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Sampling interval" = .x$sample_int
+  )
+})
+
+print(osi_result)
+
+# Sample REAL INTERVALS:
+interval_chunks <- list(
+  `1-200`   = 1:200,
+  `201-400` = 201:400,
+  `401-600` = 401:600,
+  `601-800` = 601:800,
+  `801-1000`= 801:1000
+)
+
+chunked_osi_results <- map(interval_chunks, function(chunk_vec) {
+  map_dfr(chunk_vec, function(si) {
+    sim <- content_bias_snapshot(N=100, mu=0.01, b=0.5,
+                                 burnin=1000, timesteps=1000,
+                                 p_value_lvl=0.05, n_runs=50,
+                                 inject_fvar=20, sample_int=si)
+    tibble(N  = sim$N, mu = sim$mu, b = sim$b,
+           burnin = sim$burnin, timesteps = sim$timesteps,
+           sample_int = si, SSR = sim$SSR, FNR = sim$FNR,
+           "%NA" = sim$proportionNA, "Runs" = sim$n_runs)
+  })
+})  
+
+
+# PLOTS ----------------------------------------------
+
+# %NA vs SAMPLE_INT
+# bind into one big tibble with a `chunk` column
+chunked_results_df <- imap_dfr(chunked_results, ~ .x %>% mutate(chunk = .y))
+
+# plot %NA vs. sample_int
+ggplot(chunked_results_df, aes(x = sample_int, y = pct_NA)) +
+  geom_line(alpha = 0.2) +
+  geom_smooth(method = "loess", span = 0.1, se = FALSE, colour = "steelblue") +
+  labs(
+    x     = "Sampling Interval (time steps)",
+    y     = "% of runs with NA",
+    title = "%NA vs. Sampling Interval (smoothed)"
+  ) +
+  theme_minimal(base_size = 16) +   # increase the base text size
+  theme(
+    plot.title   = element_text(size = 20, face = "bold"),
+    axis.title   = element_text(size = 18),
+    axis.text    = element_text(size = 16),
+    legend.text  = element_text(size = 16),
+    legend.title = element_text(size = 18)
+  )
