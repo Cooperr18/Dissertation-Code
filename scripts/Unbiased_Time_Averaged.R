@@ -15,21 +15,18 @@ pkgs <- c(
 lapply(pkgs, library, character.only = TRUE)
 
 
-# Parameters
-N # Number of individuals
-mu # innovation rate (numeric, between 0 and 1, inclusive)
-burnin # number of initial steps (iterations) discarded
-timesteps # actual number of time steps or "generations" after the burn-in
-p_value_lvl # Significance level
-n_runs # number of test runs
-time_window # time window size
+# PARAMETERS -----------------------------------------------------------------
+# N = Population size
+# mu = innovation rate (between 0 and 1, inclusive)
+# burnin = number of initial steps (iterations) discarded
+# timesteps = actual number of time steps or "generations" after the burn-in
+# p_value_lvl = Significance level
+# n_runs = number of test runs
+# time_window = time window/bins size
 
-accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each run
-fit_p_count <- vector("list", n_runs) # store p-values
-
-
-# Pipeline as a function ------------------------------
 set.seed(1234)
+
+# PIPELINE -------------------------------------------------------------------
 
 neutral_ta <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs, time_window) {
   
@@ -103,33 +100,48 @@ neutral_ta <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs, time_windo
       ungroup()
     
     # FIT application and storing
-    fit_results <- freq_long_filtered %>%
-      group_split(variant) %>%
-      map_dfr(~ {
-        df <- as.data.frame(.x)  # .x is a dataframe
-        
-        # check if we have enough data points
-        if (nrow(df) < 3) {
-          return(data.frame(variant = df$variant[1], time_points = nrow(df), fit_p = NA, stringsAsFactors = FALSE))
-        }
-        
-        # safely apply FIT
-        res <- tryCatch(
-          fit(time = df$time, v = df$freq),
-          error = function(e) list(fit_p = NA)  # handle errors
-        )
-        
-        data.frame(
-          variant = df$variant[1],
-          time_points = nrow(df),
-          fit_p = res$fit_p,
-          stringsAsFactors = FALSE
-        )
-      }) %>%
-      mutate(
-        sig = ifelse(fit_p > p_value_lvl, "neutral", "selection"), # neutral if >0.05
-        sig = ifelse(is.na(fit_p), "NA", sig)  # missing values
+    if (nrow(freq_long_filtered)==0) {
+      fit_results <- tibble(
+        variant = integer(),
+        time_points = integer(),
+        fit_p = double(),
+        sig = character()
       )
+    } else {
+      fit_results <- freq_long_filtered %>%
+        group_split(variant) %>%
+        map_dfr(~ {
+          df <- as.data.frame(.x)  # .x is a dataframe
+          
+          # check if we have enough data points
+          if (nrow(df) < 3) {
+            return(data.frame(variant = df$variant[1], 
+                              time_points = nrow(df), 
+                              fit_p = NA, 
+                              stringsAsFactors = FALSE))
+          }
+          
+          # safely apply FIT
+          res <- tryCatch(
+            fit(time = df$time, v = df$freq),
+            error = function(e) list(fit_p = NA)  # handle errors
+          )
+          
+          data.frame(
+            variant = df$variant[1],
+            time_points = nrow(df),
+            fit_p = res$fit_p,
+            stringsAsFactors = FALSE
+          )
+        }) %>%
+        mutate(
+          sig = case_when(
+            is.na(fit_p) ~ "NA",
+            fit_p > p_value_lvl ~ "neutral",
+            TRUE  ~ "selection"
+          )
+        )
+    }
     
     # p-value count
     fit_p_count[[run]] <- fit_results$fit_p
@@ -161,12 +173,8 @@ neutral_ta <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs, time_windo
   
   # Store output
   return(list(
-    accuracy_ta = accuracy_ta,
-    mean_accuracy = mean_accuracy,
-    high_accuracy_runs = high_accuracy_runs,
-    sumNA = sumNA,
-    proportionNA = proportionNA,
-    fit_p_count = fit_p_count,
+    
+    # Parameters
     N = N,
     mu = mu,
     burnin = burnin,
@@ -174,8 +182,17 @@ neutral_ta <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs, time_windo
     p_value_lvl = p_value_lvl,
     n_runs = n_runs,
     time_window = time_window,
+    
+    # Output
+    accuracy_ta = accuracy_ta,
+    mean_accuracy = mean_accuracy,
+    high_accuracy_runs = high_accuracy_runs,
+    sumNA = sumNA,
+    proportionNA = proportionNA,
+    fit_p_count = fit_p_count,
     all_pvals = all_pvals
-  ))
+    )
+  )
 }
 
 
@@ -203,9 +220,9 @@ results_table_neutral_ta <- tibble(
 )
 results_table_neutral_ta
 
-# Run many parameter-sets and stack the results
+# Run many parameter-sets and stack the results --------------------------------
 
-# Innovation rate ------------
+# Innovation rate --------------------------------------------------------------
 n_ta_mu_params <- list(
   list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
   list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
@@ -218,7 +235,7 @@ n_ta_mu_params <- list(
   list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20)
 )
 
-# Population size --------------
+# Population size --------------------------------------------------------------
 n_ta_N_params <- list(
   list(N=10, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
   list(N=50, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20),
@@ -231,7 +248,7 @@ n_ta_N_params <- list(
   list(N=400, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 20)
 )
 
-# Time series -----------
+# Time series ------------------------------------------------------------------
 n_ta_time_params <- list(
   list(N=100, mu=0.01, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100, time_window = 20),
   list(N=100, mu=0.01, burnin=200, timesteps=200, p_value_lvl=0.05, n_runs=100, time_window = 20),
@@ -244,7 +261,7 @@ n_ta_time_params <- list(
   list(N=100, mu=0.01, burnin=3000, timesteps=3000, p_value_lvl=0.05, n_runs=100, time_window = 20)
 )
 
-# Time window size ---------------
+# Time window size -------------------------------------------------------------
 n_ta_time_params <- list(
   list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 5),
   list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 10),
@@ -257,28 +274,76 @@ n_ta_time_params <- list(
   list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100, time_window = 200)
 )
 
-# Run and store ----
-n_ta_time_results <- map_dfr(n_ta_time_params, ~ {
-  sim <- do.call(neutral_snapshot, args = .x)
+
+# Run and store --------------------------------------------------------------------
+
+# INNOVATION RATE (MU)
+n_ta_mu_results <- map_dfr(n_ta_mu_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
   tibble(N  = .x$N,
          mu = .x$mu,
          burnin = .x$burnin,
          timesteps = .x$timesteps,
-         "Time window size" = .x$time_window
+         "Time window size" = .x$time_window,
          "α" = .x$p_value_lvl,
-         "Runs" = .x$n_runs,
          "NDR" = round(sim$mean_accuracy, 3),
          "%NA" = round(sim$proportionNA, 2),
-         "Mean p-value" = round(mean(sim$all_pvals, na.rm = TRUE), 3)
+         "Runs" = .x$n_runs
   )
 })
 
+# POPULATION SIZE (N)
+n_ta_N_results <- map_dfr(n_ta_N_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
+  )
+})
+
+# TIME SERIES
+n_ta_time_results <- map_dfr(n_ta_time_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
+  )
+})
+
+# TIME WINDOW/BIN SIZE (time_window)
+n_ta_tw_results <- map_dfr(n_ta_tw_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
+  )
+})
+
+# PRINT RESULTS
 print(n_ta_mu_results)
 print(n_ta_N_results)
 print(n_ta_time_results)
 print(n_ta_tw_results)
 
-# Export results to an excel
+# EXPORT TO SPREADSHEET
 write_xlsx(n_ta_mu_results, "tables/n_ta_output/n_ta_mu_params.xlsx") # mu
 
 write_xlsx(n_ta_N_results, "tables/n_ta_output/n_ta_N_params.xlsx") # N
@@ -288,7 +353,7 @@ write_xlsx(n_ta_time_results, "tables/n_ta_output/n_ta_time_params.xlsx") # time
 write_xlsx(n_ta_tw_params, "tables/n_ta_output/n_ta_tw_params.xlsx") # time window size
 
 
-# PLOTS ----
+# PLOTS ------------------------------------------------------------------------
 
 # Plot distribution of NDR, marking the 95% threshold
 plot_neutral_ta <- function(n_ta_sim, binwidth = 0.005) {

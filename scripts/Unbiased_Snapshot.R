@@ -15,20 +15,17 @@ pkgs <- c(
 )
 lapply(pkgs, library, character.only = TRUE)
 
-# Parameters
-N # Number of individuals
-mu # innovation rate (numeric, between 0 and 1, inclusive)
-burnin # number of initial steps (iterations) discarded
-timesteps # actual number of time steps or "generations" after the burn-in
-p_value_lvl # Significance level
-n_runs # number of test runs
+# PARAMETERS -----------------------------------------------------------------
+# N = Population size
+# mu = innovation rate (between 0 and 1, inclusive)
+# burnin = number of initial steps (iterations) discarded
+# timesteps = actual number of time steps or "generations" after the burn-in
+# p_value_lvl = Significance level
+# n_runs = number of test runs
 
-accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each run
-fit_p_count <- vector("list", n_runs) # store p-values
-
-
-# Pipeline as a function --------------------
 set.seed(1234)
+
+# PIPELINE -------------------------------------------------------------------
 
 neutral_snapshot <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs) {
 
@@ -149,23 +146,28 @@ neutral_snapshot <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs) {
   
   # Store output
   return(list(
-    accuracy_snapshot = accuracy_snapshot,
-    mean_accuracy = mean_accuracy,
-    high_accuracy_runs = high_accuracy_runs,
-    sumNA = sumNA,
-    proportionNA = proportionNA,
-    fit_p_count = fit_p_count,
+    
+    # PARAMETERS
     N = N,
     mu = mu,
     burnin = burnin,
     timesteps = timesteps,
     p_value_lvl = p_value_lvl,
     n_runs = n_runs,
-    all_pvals = all_pvals
-  ))
+    all_pvals = all_pvals,
+    
+    # OUTPUTS
+    accuracy_snapshot = accuracy_snapshot,
+    mean_accuracy = mean_accuracy,
+    high_accuracy_runs = high_accuracy_runs,
+    sumNA = sumNA,
+    proportionNA = proportionNA,
+    fit_p_count = fit_p_count
+    )
+  )
 }
 
-# Run simulation with parameters
+# Run simulation with one parameter combination
 n_snap_sim <- neutral_snapshot(N = 100, mu = 0.02, burnin = 1000,
                               timesteps = 1000, p_value_lvl = 0.05, n_runs = 10)
 
@@ -187,9 +189,10 @@ results_table_neutral_snapshot <- tibble(
 )
 results_table_neutral_snapshot
 
-# Run many parameter-sets and stack the results
 
-# Innovation rate ------------
+# Run many parameter-sets and stack the results ------------------------------------
+
+# Innovation rate ------------------------------------------------------------------
 n_snap_mu_params <- list(
   list(N=100, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
   list(N=100, mu=0.025, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
@@ -202,7 +205,7 @@ n_snap_mu_params <- list(
   list(N=100, mu=0.2, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100)
 )
 
-# Population size --------------
+# Population size ------------------------------------------------------------------
 n_snap_N_params <- list(
   list(N=10, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
   list(N=50, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100),
@@ -215,7 +218,7 @@ n_snap_N_params <- list(
   list(N=400, mu=0.01, burnin=1000, timesteps=1000, p_value_lvl=0.05, n_runs=100)
 )
 
-# Time series -----------
+# Time series ----------------------------------------------------------------------
 n_snap_time_params <- list(
   list(N=100, mu=0.01, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100),
   list(N=100, mu=0.01, burnin=200, timesteps=200, p_value_lvl=0.05, n_runs=100),
@@ -229,7 +232,39 @@ n_snap_time_params <- list(
 )
 
 
-# Run and store ----
+# Run and store --------------------------------------------------------------------
+
+# INNOVATION RATE (MU)
+n_snap_mu_results <- map_dfr(n_snap_mu_params, ~ {
+  sim <- do.call(neutral_snaphot, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
+  )
+})
+
+# POPULATION SIZE (N)
+n_snap_N_results <- map_dfr(n_snap_N_params, ~ {
+  sim <- do.call(neutral_snapshot, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
+  )
+})
+
+# TIME SERIES
 n_snap_time_results <- map_dfr(n_snap_time_params, ~ {
   sim <- do.call(neutral_snapshot, args = .x)
   tibble(N  = .x$N,
@@ -244,11 +279,12 @@ n_snap_time_results <- map_dfr(n_snap_time_params, ~ {
   )
 })
 
+# PRINT RESULTS
 print(n_snap_mu_results)
 print(n_snap_N_results)
 print(n_snap_time_results)
 
-# Export results to an excel
+# EXPORT TO SPREADSHEET
 write_xlsx(n_snap_mu_results, "tables/n_snap_output/n_snap_mu_params.xlsx") # mu
 
 write_xlsx(n_snap_N_results, "tables/n_snap_output/n_snap_N_params.xlsx") # N
@@ -257,7 +293,7 @@ write_xlsx(n_snap_time_params, "tables/n_snap_output/n_snap_time_params.xlsx") #
 
 
 
-# PLOTS ----
+# PLOTS ------------------------------------------------------------------------
 
 # Plot distribution of NDR, marking the 95% threshold
 plot_neutral_snapshot <- function(n_snap_sim, binwidth = 0.005) {
