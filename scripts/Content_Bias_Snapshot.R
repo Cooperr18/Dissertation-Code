@@ -2,50 +2,40 @@
 ################ CONTENT BIAS SNAPSHOT ##################
 #########################################################
 
-# Install signatselect
-install.packages("pak")
-pak::pkg_install("benmarwick/signatselect")
-
 # Reading packages
 pkgs <- c(
-  "signatselect","dplyr","ggplot2",
+  "pak","dplyr","ggplot2",
   "tidyr","gridExtra","purrr",
   "tibble","writexl"
 )
 lapply(pkgs, library, character.only = TRUE)
 
+# Install signatselect
+pak::pkg_install("benmarwick/signatselect")
+library(signatselect)
+
 # Modeled as in Boyd & Richerson (1985, p. 140)
 
-# PARAMETERS -----------------------------------------------------------------
-# N = Number of individuals
-# mu = innovation rate (between 0 and 1, inclusive)
-# b = direct/content bias
-# w = normalized weight (1 + b)
-# burnin = number of initial steps (iterations) discarded
-# timesteps = actual number of time steps or "generations" after the burn-in
-# p_value_lvl = Significance level
-# n_runs = number of test runs
-# sample_int = sample interval
-
-set.seed(1234)
-
 # PIPELINE -------------------------------------------------------------------
-content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl, 
-                                  n_runs, inject_fvar, sample_int) {
+content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
+                                  p_value_lvl, n_runs,
+                                  p_extinct = 0.05, inject_override=NULL) {
   
-  # compute generations recorded
-  sample_times <- seq(1, timesteps, by = sample_int)
-  n_samples <- length(sample_times)
-  
-  # Assign selected variant
-  sel_variant_snap <- N + 1 # reserve this slot
+  # compute minimal inject count to ensure focal survives >= 3 time points
+  if (is.null(inject_override)) {
+    inject_fvar <- ceiling(N * (1 - p_extinct^(1 / (2 * N))))
+  } else {
+    inject_fvar <- inject_override
+  }
+  message(sprintf("[Diagnostics] inject_fvar = %d (override=%s)",
+                  inject_fvar, ifelse(is.null(inject_override), "F", "T")))
   
   # Table to store results for the focal variant 
   results_snap <- tibble(
     run = seq_len(n_runs),
-    variant = rep(sel_variant_snap, n_runs), # number of variant
-    fit_p = rep(NA_real_, n_runs), # default NA
-    inference = rep(NA_character_, n_runs) # default NA character
+    variant = NA_integer_, # number of variant
+    fit_p = NA_real_, # default NA
+    inference = NA_character_ # default NA character
   )
   
   fit_p_count <- vector("list", n_runs) # store p-values
@@ -54,7 +44,7 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl,
     
     # Initialize population and matrix
     ini <- 1:N # Initial cultural variants
-    traitmatrix <- matrix(NA,nrow=n_samples,ncol=N) # Only sampled times, not whole sequence
+    traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Only sampled times, not whole sequence
     pop <- ini # initial population of variants to pop
     maxtrait <- N 
     
@@ -71,19 +61,21 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl,
       }
     }
     
+    # Define focal variant label after burn-in to avoid innovation collision
+    sel_variant_snap <- maxtrait + 1
+    results_snap$variant[run] <- sel_variant_snap
+    
     # Inject focal variant in t = 1
     pop[1:inject_fvar] <- sel_variant_snap        
     maxtrait  <- sel_variant_snap
     traitmatrix[1, ] <- pop 
     
     # Observation period after equilibrium
-    sample_row <- 1 # start of sampling intervals
-    
-    for (i in 2:timesteps) {
+    for (gen in 2:timesteps) {
       
       # apply content biased transmission
-      w <- ifelse(pop == sel_variant_snap, 1 + b, 1) # selected variant weighs 1 + s, neutral = 1
-      pop <- sample(pop,replace=T,prob = w) # add the weights as probabilities
+      a <- ifelse(pop == sel_variant_snap, 1 + b, 1) # selected variant weighs 1 + s, neutral = 1
+      pop <- sample(pop,replace=T,prob = a) # add the weights as probabilities
       
       # Neutral innovation
       innovate <- which(runif(N)<mu) 
@@ -92,27 +84,24 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl,
         pop[innovate] <- new_variants
         maxtrait <- max(pop)
       }
-      
-      if (i %in% sample_times) {
-        sample_row  <- sample_row + 1
-        traitmatrix[sample_row, ] <- pop
-      }
+      traitmatrix[gen, ] <- pop
     }
     
+    # Build count matrix
     unique_variants <- sort(unique(as.vector(traitmatrix)))
-    
-    # Trait matrix to long format
     freq_mat <- t(apply(traitmatrix, 1, function(row) {
       tab <- table(factor(row, levels = unique_variants))
-      as.numeric(tab)/N # Convert to frequencies
+      as.numeric(tab) / N # counts to frequencies
     }))
-    colnames(freq_mat) <- unique_variants # give names
+    colnames(freq_mat) <- as.character(unique_variants) # give names
+    
+    # DIAGNOSTIC: check focal frequencies
     
     # Prepare FIT input
-    freq_long <- as.data.frame(freq_mat) %>%
-      mutate(time = sample_times) %>%
+    freq_long <- as_tibble(freq_mat) %>%
+      mutate(time = seq_len(nrow(freq_mat))) %>%
       pivot_longer(-time, names_to="variant", values_to="freq") %>% # long format
-      filter(freq > 0) %>% # remove zeros
+      filter(variant == sel_variant_snap | freq > 0) %>%
       mutate(variant = as.integer(variant))
     
     # Filter data to 3 time points
@@ -139,13 +128,16 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl,
           
           # check if we have enough data points
           if (nrow(df) < 3) {
-            return(data.frame(variant = df$variant[1], time_points = nrow(df), fit_p = NA, stringsAsFactors = FALSE))
+            return(data.frame(variant = df$variant[1], 
+                              time_points = nrow(df), 
+                              fit_p = NA_real_, 
+                              stringsAsFactors = FALSE))
           }
           
           # safely apply FIT
           res <- tryCatch(
             fit(time = df$time, v = df$freq),
-            error = function(e) list(fit_p = NA)
+            error = function(e) list(fit_p = NA_real_)
           )
           
           data.frame(
@@ -185,7 +177,7 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl,
     results_snap$inference[run] <- inf
   }
   
-  # Compute output
+  # Summarise output
   sel <- sum(results_snap$inference == "selection", na.rm = T)
   neut <- sum(results_snap$inference == "neutral", na.rm = T)
   sumNA <- sum(is.na(results_snap$inference))
@@ -207,8 +199,6 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl,
     timesteps = timesteps,
     p_value_lvl = p_value_lvl,
     n_runs = n_runs,
-    inject_fvar = inject_fvar,
-    sample_int = sample_int,
     
     # outputs
     all_pvals = all_pvals,
@@ -219,94 +209,192 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps, p_value_lvl,
     fit_p_count = fit_p_count,
     fit_results = fit_results, # global results
     results_snap = results_snap # focal variant results
-  )
+    )
   )
 }
 
-# Optimal sampling intervals --------------------------------
-interval_chunks <- list(
-  `1-200`   = 1:200,
-  `201-400` = 201:400,
-  `401-600` = 401:600,
-  `601-800` = 601:800,
-  `801-1000`= 801:1000
+# BASELINE SIMULATION
+cb_snap_sim <- content_bias_snapshot(N = 100, mu = 0.02, burnin = 500, b = 0.25,
+                                     timesteps = 100, p_value_lvl = 0.05, n_runs = 100)
+
+# Store output across runs in a table
+results_table_cb_snapshot <- tibble(
+  N  = cb_snap_sim$N,
+  "µ" = cb_snap_sim$mu,
+  b = cb_snap_sim$b,
+  "Burn-in" = cb_snap_sim$burnin,
+  "Time steps" = cb_snap_sim$timesteps,
+  "α" = cb_snap_sim$p_value_lvl,
+  SSR = cb_snap_sim$SSR,
+  FNR = cb_snap_sim$FNR,
+  proportionNA = cb_snap_sim$proportionNA,
+  "Runs" = cb_snap_sim$n_runs
 )
 
-chunked_osi_results <- map(interval_chunks, function(chunk_vec) {
-  map_dfr(chunk_vec, function(si) {
-    sim <- content_bias_snapshot(N=100, mu=0.01, b=0.5,
-                                 burnin=1000, timesteps=1000,
-                                 p_value_lvl=0.05, n_runs=50,
-                                 inject_fvar=20, sample_int=si)
-    tibble(N  = sim$N, mu = sim$mu, b = sim$b,
-           burnin = sim$burnin, timesteps = sim$timesteps,
-           sample_int = si, SSR = sim$SSR, FNR = sim$FNR,
-           "%NA" = sim$proportionNA, "Runs" = sim$n_runs)
-  })
-})
-
-print(chunked_osi_results)
+print(results_table_cb_snapshot)
 
 
-# Initial frequency of the variant (inject_fvar) ------------------------------
-fvar_list_snap <- list(
-  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
-       p_value_lvl=0.05, n_runs=50, sample_int = 500, inject_fvar = 5),
-  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
-       p_value_lvl=0.05, n_runs=50, sample_int = 500, inject_fvar = 10),
-  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
-       p_value_lvl=0.05, n_runs=50, sample_int = 500, inject_fvar = 25),
-  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
-       p_value_lvl=0.05, n_runs=50, sample_int = 500, inject_fvar = 50),
-  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
-       p_value_lvl=0.05, n_runs=50, sample_int = 500, inject_fvar = 60),
-  list(N=100, mu=0.01, b = 0.5, burnin=1000, timesteps=1000, 
-       p_value_lvl=0.05, n_runs=50, sample_int = 500, inject_fvar = 75),
+# PARAMETER SWEEP ------------------------------------------------------------------
+
+# Innovation rate ------------------------------------------------------------------
+cb_snap_mu_params <- list(
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.025, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.05, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.075, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.1, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.125, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.15, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.175, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.2, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100)
 )
 
-# Run and store in a table
-fvar_result_snap <- map_dfr(fvar_list_snap, ~ {
-  args <- .x
-  args$sample_int <- as.integer(args$sample_int)
-  sim <- do.call(content_bias_snapshot, args = args)
+# Population size ------------------------------------------------------------------
+cb_snap_N_params <- list(
+  list(N=10, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=50, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=150, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=200, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=250, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=300, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=350, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=400, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100)
+)
+
+# Content bias
+cb_snap_b_params <- list(
+  list(N=100, mu=0.01, b = 0, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.05, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.1, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.2, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.25, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.3, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.35, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.4, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100)
+)
+
+# Time series ----------------------------------------------------------------------
+cb_snap_time_params <- list(
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=10, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=50, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=150, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=200, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=250, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=300, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=350, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=400, p_value_lvl=0.05, n_runs=100)
+)
+
+# Runs ----------------------------------------------------------------------
+cb_snap_time_params <- list(
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=10),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=50),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=500),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=1000),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=5000),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=10000),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=15000),
+  list(N=100, mu=0.01, b = 0.15, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=100000)
+)
+
+
+# Run and store --------------------------------------------------------------------
+
+# INNOVATION RATE (MU)
+cb_snap_mu_results <- map_dfr(cb_snap_mu_params, ~ {
+  sim <- do.call(neutral_snaphot, args = .x)
   tibble(N  = .x$N,
          mu = .x$mu,
          b = .x$b,
          burnin = .x$burnin,
          timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
          "α" = .x$p_value_lvl,
-         "SSR" = round(sim$SSR, 3),
-         "FNR" = round(sim$FNR, 3),
+         "NDR" = round(sim$mean_accuracy, 3),
          "%NA" = round(sim$proportionNA, 2),
-         "Sampling interval" = .x$sample_int,
-         "Initial freq" = .x$inject_fvar,
          "Runs" = .x$n_runs
   )
 })
 
-print(fvar_result_snap) 
-
-
-# PLOTS ----------------------------------------------
-
-# %NA vs SAMPLE_INT
-# bind into one big tibble with a `chunk` column
-chunked_results_df <- imap_dfr(chunked_results, ~ .x %>% mutate(chunk = .y))
-
-# plot %NA vs. sample_int
-ggplot(chunked_results_df, aes(x = sample_int, y = pct_NA)) +
-  geom_line(alpha = 0.2) +
-  geom_smooth(method = "loess", span = 0.1, se = FALSE, colour = "steelblue") +
-  labs(
-    x     = "Sampling Interval (time steps)",
-    y     = "% of runs with NA",
-    title = "%NA vs. Sampling Interval (smoothed)"
-  ) +
-  theme_minimal(base_size = 16) +   # increase the base text size
-  theme(
-    plot.title   = element_text(size = 20, face = "bold"),
-    axis.title   = element_text(size = 18),
-    axis.text    = element_text(size = 16),
-    legend.text  = element_text(size = 16),
-    legend.title = element_text(size = 18)
+# POPULATION SIZE (N)
+cb_snap_N_results <- map_dfr(cb_snap_N_params, ~ {
+  sim <- do.call(content_bias_snapshot, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         b = .x$b,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
   )
+})
+
+# CONTENT BIAS (b)
+cb_snap_N_results <- map_dfr(cb_snap_b_params, ~ {
+  sim <- do.call(content_bias_snapshot, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         b = .x$b,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
+  )
+})
+
+# POPULATION SIZE (N)
+cb_snap_N_results <- map_dfr(cb_snap_b_params, ~ {
+  sim <- do.call(content_bias_snapshot, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         b = .x$b,
+         burnin = .x$burnin,
+         timesteps = .x$timesteps,
+         "Time window size" = .x$time_window,
+         "α" = .x$p_value_lvl,
+         "NDR" = round(sim$mean_accuracy, 3),
+         "%NA" = round(sim$proportionNA, 2),
+         "Runs" = .x$n_runs
+  )
+})
+
+# TIME SERIES
+cb_snap_time_results <- map_dfr(cb_snap_time_params, ~ {
+  sim <- do.call(content_bias_snapshot, args = .x)
+  tibble(N  = .x$N,
+         mu = .x$mu,
+         burnin = .x$burnin,
+         b = .x$b,
+         timesteps = .x$timesteps,
+         "α" = .x$p_value_lvl,
+         "NDR" = sim$mean_accuracy,
+         "FPR" = 1 - sim$mean_accuracy,
+         "%NA" = sim$proportionNA,
+         "Runs" = .x$n_runs,
+  )
+})
+
+# PRINT RESULTS
+print(cb_snap_mu_results)
+print(cb_snap_N_results)
+print(cb_snap_b_results)
+print(cb_snap_time_results)
+
+# EXPORT TO SPREADSHEET
+write_xlsx(cb_snap_mu_results, "tables/cb_snap_output/cb_snap_mu_params.xlsx") # mu
+
+write_xlsx(cb_snap_N_results, "tables/cb_snap_output/cb_snap_N_params.xlsx") # N
+
+write_xlsx(cb_snap_b_results, "tables/cb_snap_output/cb_snap_b_params.xlsx") # b
+
+write_xlsx(cb_snap_time_params, "tables/cb_snap_output/cb_snap_time_params.xlsx") # time series

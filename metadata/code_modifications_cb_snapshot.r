@@ -213,3 +213,28 @@ ggplot(chunked_results_df, aes(x = sample_int, y = pct_NA)) +
     legend.text  = element_text(size = 16),
     legend.title = element_text(size = 18)
   )
+  
+# compute minimal inject count to ensure focal survives >= 3 time points
+  inject_fvar <- ceiling(N * (1 - p_extinct^(1 / (2 * N))))
+  
+# Inject variant using the formula, otherwise inject it calling an integer in the function argument
+if (is.null(inject_override)) {
+    inject_fvar <- ceiling(N * (1 - p_extinct^(1 / (2 * N))))
+  } else {
+    inject_fvar <- inject_override
+  }
+  message(sprintf("[Diagnostics] inject_fvar = %d (override = %s)",
+                  inject_fvar,
+                  ifelse(is.null(inject_override), "false", "true")))
+				  
+# From frequencies to raw counts per generation
+as.numeric(tab)/N # Convert to frequencies
+# to
+as.integer(tab)  # raw counts per generation
+
+# Went back to frequencies
+# Added a message to examine the frequencies of the focal variants across runs
+# DIAGNOSTIC: check focal frequencies
+    fv <- freq_mat[, as.character(sel_variant_snap)]
+    message(sprintf("Run %d: focal counts first 10 gens = %s", run,
+                    paste(head(fv,25), collapse=",")))
