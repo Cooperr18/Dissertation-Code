@@ -308,14 +308,14 @@ cb_snap_time_params <- list(
 cb_snap_mu_results <- map_dfr(cb_snap_mu_params, ~ {
   sim <- do.call(neutral_snaphot, args = .x)
   tibble(N  = .x$N,
-         mu = .x$mu,
+         "µ" = .x$mu,
          b = .x$b,
-         burnin = .x$burnin,
-         timesteps = .x$timesteps,
-         "Time window size" = .x$time_window,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
          "α" = .x$p_value_lvl,
-         "NDR" = round(sim$mean_accuracy, 3),
-         "%NA" = round(sim$proportionNA, 2),
+         SSR = sim$SSR,
+         FNR = sim$FNR,
+         proportionNA = sim$proportionNA,
          "Runs" = .x$n_runs
   )
 })
@@ -324,14 +324,14 @@ cb_snap_mu_results <- map_dfr(cb_snap_mu_params, ~ {
 cb_snap_N_results <- map_dfr(cb_snap_N_params, ~ {
   sim <- do.call(content_bias_snapshot, args = .x)
   tibble(N  = .x$N,
-         mu = .x$mu,
+         "µ" = .x$mu,
          b = .x$b,
-         burnin = .x$burnin,
-         timesteps = .x$timesteps,
-         "Time window size" = .x$time_window,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
          "α" = .x$p_value_lvl,
-         "NDR" = round(sim$mean_accuracy, 3),
-         "%NA" = round(sim$proportionNA, 2),
+         SSR = sim$SSR,
+         FNR = sim$FNR,
+         proportionNA = sim$proportionNA,
          "Runs" = .x$n_runs
   )
 })
@@ -340,14 +340,14 @@ cb_snap_N_results <- map_dfr(cb_snap_N_params, ~ {
 cb_snap_N_results <- map_dfr(cb_snap_b_params, ~ {
   sim <- do.call(content_bias_snapshot, args = .x)
   tibble(N  = .x$N,
-         mu = .x$mu,
+         "µ" = .x$mu,
          b = .x$b,
-         burnin = .x$burnin,
-         timesteps = .x$timesteps,
-         "Time window size" = .x$time_window,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
          "α" = .x$p_value_lvl,
-         "NDR" = round(sim$mean_accuracy, 3),
-         "%NA" = round(sim$proportionNA, 2),
+         SSR = sim$SSR,
+         FNR = sim$FNR,
+         proportionNA = sim$proportionNA,
          "Runs" = .x$n_runs
   )
 })
@@ -356,14 +356,14 @@ cb_snap_N_results <- map_dfr(cb_snap_b_params, ~ {
 cb_snap_N_results <- map_dfr(cb_snap_b_params, ~ {
   sim <- do.call(content_bias_snapshot, args = .x)
   tibble(N  = .x$N,
-         mu = .x$mu,
+         "µ" = .x$mu,
          b = .x$b,
-         burnin = .x$burnin,
-         timesteps = .x$timesteps,
-         "Time window size" = .x$time_window,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
          "α" = .x$p_value_lvl,
-         "NDR" = round(sim$mean_accuracy, 3),
-         "%NA" = round(sim$proportionNA, 2),
+         SSR = sim$SSR,
+         FNR = sim$FNR,
+         proportionNA = sim$proportionNA,
          "Runs" = .x$n_runs
   )
 })

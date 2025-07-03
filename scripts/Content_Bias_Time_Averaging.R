@@ -255,29 +255,84 @@ results_table_cb_ta <- tibble(
 print(results_table_cb_ta)
 
 
-# PARAMETER SWEEP
-params_cb_snapshot <- list(
-  list(N=100, mu=0.02, s_true = 0.1, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100),
-  list(N=100, mu=0.02, s_true = 0.25, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100),
-  list(N=100, mu=0.02, s_true = 0.5, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100),
-  list(N=100, mu=0.02, s_true = 0.75, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100),
-  list(N=100, mu=0.02, s_true = 0.9, burnin=100, timesteps=100, p_value_lvl=0.05, n_runs=100)
-)
-
-all_results_cb_snapshot <- map_dfr(params_cb_snapshot, ~ {
-  sim <- do.call(content_bias_snapshot, args = .x)
-  tibble("Focal Variant" = sim$sel_variant_ta,
-         N  = .x$N,
-         mu = .x$mu,
-         "S" = .x$s_true,
-         burnin = .x$burnin,
-         timesteps = .x$timesteps,
-         α = .x$p_value_lvl,
+# Run and store ------------------------------------------
+cb_ta_mu_results <- map_dfr(cb_ta_mu_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         "µ" = .x$mu,
+         b = .x$b,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
+         "w" = .x$time_window
+         "α" = .x$p_value_lvl,
          SSR = sim$SSR,
          FNR = sim$FNR,
-         "%NA" = round(sim$proportionNA, 2)*100,
-         n_runs = .x$n_runs,
+         proportionNA = sim$proportionNA,
+         "Runs" = .x$n_runs
   )
 })
 
-all_results_cb_snapshot 
+cb_ta_N_results <- map_dfr(cb_ta_N_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         "µ" = .x$mu,
+         b = .x$b,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
+         "w" = .x$time_window
+         "α" = .x$p_value_lvl,
+         SSR = sim$SSR,
+         FNR = sim$FNR,
+         proportionNA = sim$proportionNA,
+         "Runs" = .x$n_runs
+  )
+})
+
+cb_ta_time_results <- map_dfr(cb_ta_time_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         "µ" = .x$mu,
+         b = .x$b,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
+         "w" = .x$time_window
+         "α" = .x$p_value_lvl,
+         SSR = sim$SSR,
+         FNR = sim$FNR,
+         proportionNA = sim$proportionNA,
+         "Runs" = .x$n_runs
+  )
+})
+
+cb_ta_tw_results <- map_dfr(cb_ta_tw_params, ~ {
+  sim <- do.call(neutral_ta, args = .x)
+  tibble(N  = .x$N,
+         "µ" = .x$mu,
+         b = .x$b,
+         "Burn-in" = .x$burnin,
+         "Time steps" = .xm$timesteps,
+         "w" = .x$time_window
+         "α" = .x$p_value_lvl,
+         SSR = sim$SSR,
+         FNR = sim$FNR,
+         proportionNA = sim$proportionNA,
+         "Runs" = .x$n_runs
+  )
+})
+
+print(cb_ta_mu_results)
+print(cb_ta_N_results)
+print(cb_ta_time_results)
+print(cb_ta_tw_results)
+
+# Export results to an excel
+
+write_xlsx(cb_ta_mu_results, "cb_ta_output/cb_ta_mu_params2.xlsx") # mu
+
+write_xlsx(cb_ta_N_results, "cb_ta_output/cb_ta_N_params2.xlsx") # N
+
+write_xlsx(cb_ta_time_results, "cb_ta_output/cb_ta_time_params2.xlsx") # time series
+
+write_xlsx(cb_ta_tw_results, "cb_ta_output/cb_ta_tw_params2.xlsx") # time window size
+
+
