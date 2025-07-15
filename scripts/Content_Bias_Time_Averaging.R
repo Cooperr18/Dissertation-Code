@@ -1,5 +1,5 @@
 #########################################################
-################ CONTENT BIAS SNAPSHOT ##################
+############ CONTENT BIAS TIME AVERAGING ################
 #########################################################
 
 # Reading packages
@@ -25,14 +25,15 @@ library(signatselect)
 # timesteps = actual number of time steps or "generations" after the burn-in
 # p_value_lvl = Significance level
 # n_runs = number of test runs
+# time_window = time window size
 
 set.seed(1234)
 
-# PIPELINE -------------------------------------------------------------------
-content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
-                                  p_value_lvl, n_runs,
-                                  p_extinct = 0.05, inject_override=NULL) {
-  
+# PIPELINE ---------------------------------------------------------------------
+content_bias_ta <- function(N, mu, b, burnin, timesteps, 
+                            p_value_lvl, n_runs, time_window,
+                            p_extinct = 0.05, inject_override=NULL) {
+
   # compute minimal inject count to ensure focal survives >= 3 time points
   if (is.null(inject_override)) {
     inject_fvar <- ceiling(N * (1 - p_extinct^(1 / (2 * N))))
@@ -41,7 +42,7 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
   }
   
   # Table to store results for the focal variant 
-  results_snap <- tibble(
+  results_ta <- tibble(
     run = seq_len(n_runs),
     variant = NA_integer_, # number of variant
     fit_p = NA_real_, # default NA
@@ -54,7 +55,7 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
     
     # Initialize population and matrix
     ini <- 1:N # Initial cultural variants
-    traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Only sampled times, not whole sequence
+    traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # record every time step
     pop <- ini # initial population of variants to pop
     maxtrait <- N 
     
@@ -72,19 +73,19 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
     }
     
     # Define focal variant label after burn-in to avoid innovation collision
-    sel_variant_snap <- maxtrait + 1
-    results_snap$variant[run] <- sel_variant_snap
+    sel_variant_ta <- maxtrait + 1
+    results_ta$variant[run] <- sel_variant_ta
     
     # Inject focal variant in t = 1
-    pop[1:inject_fvar] <- sel_variant_snap        
-    maxtrait  <- sel_variant_snap
+    pop[1:inject_fvar] <- sel_variant_ta        
+    maxtrait  <- sel_variant_ta
     traitmatrix[1, ] <- pop 
     
     # Observation period after equilibrium
     for (gen in 2:timesteps) {
       
       # apply content biased transmission
-      a <- ifelse(pop == sel_variant_snap, 1 + b, 1) # selected variant weighs 1 + s, neutral = 1
+      a <- ifelse(pop == sel_variant_ta, 1 + b, 1) # selected variant weighs 1 + s, neutral = 1
       pop <- sample(pop,replace=T,prob = a) # add the weights as probabilities
       
       # Neutral innovation
@@ -97,21 +98,31 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
       traitmatrix[gen, ] <- pop
     }
     
-    # Build count matrix
-    unique_variants <- sort(unique(as.vector(traitmatrix)))
-    freq_mat <- t(apply(traitmatrix, 1, function(row) {
-      tab <- table(factor(row, levels = unique_variants))
-      as.numeric(tab) / N # counts to frequencies
-    }))
-    colnames(freq_mat) <- as.character(unique_variants) # give names
+    # Time averaging step
+    averaged_rows <- floor(timesteps / time_window) # round down to nearest whole number
     
-    # DIAGNOSTIC: check focal frequencies
+    # list of time-averaged samples (each is a vector of N * time_window variants)
+    averaged_samples <- vector("list", averaged_rows)
+    for (j in 1:averaged_rows) {
+      start <- (j - 1) * time_window + 1
+      end <- j * time_window
+      # Flatten all traits in the time window into one vector
+      averaged_samples[[j]] <- as.vector(traitmatrix[start:end, ])
+    }
+    
+    # Build frequency matrix
+    unique_variants <- sort(unique(unlist(averaged_samples))) # store unique variants across all bins
+    freq_mat <- t(sapply(averaged_samples, function(variants) {
+      tab <- table(factor(variants, levels = unique_variants))
+      as.numeric(tab) / length(variants)  # Proportions relative to N * time_window
+    }))
+    colnames(freq_mat) <- unique_variants
     
     # Prepare FIT input
-    freq_long <- as_tibble(freq_mat) %>%
-      mutate(time = seq_len(nrow(freq_mat))) %>%
+    freq_long <- as.data.frame(freq_mat) %>%
+      mutate(time = 1:nrow(.)) %>%
       pivot_longer(-time, names_to="variant", values_to="freq") %>% # long format
-      filter(variant == sel_variant_snap | freq > 0) %>%
+      filter(freq > 0) %>% # remove zeros
       mutate(variant = as.integer(variant))
     
     # Filter data to 3 time points
@@ -119,16 +130,6 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
       group_by(variant) %>%
       filter(n_distinct(time) >= 3) %>%
       ungroup()
-    
-    # If it's empty (0 time points) return NA
-    if (nrow(freq_long_filtered) == 0) {
-      fit_results <- tibble(
-        variant = sel_variant_snap,
-        time_points = 0L,
-        fit_p = NA_real_,
-        sig = "NA"
-      )
-    } else {
       
       # Apply FIT and store
       fit_results <- freq_long_filtered %>%
@@ -138,16 +139,13 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
           
           # check if we have enough data points
           if (nrow(df) < 3) {
-            return(data.frame(variant = df$variant[1], 
-                              time_points = nrow(df), 
-                              fit_p = NA_real_, 
-                              stringsAsFactors = FALSE))
+            return(data.frame(variant = df$variant[1], time_points = nrow(df), fit_p = NA, stringsAsFactors = FALSE))
           }
           
           # safely apply FIT
           res <- tryCatch(
             fit(time = df$time, v = df$freq),
-            error = function(e) list(fit_p = NA_real_)
+            error = function(e) list(fit_p = NA)
           )
           
           data.frame(
@@ -161,13 +159,12 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
           sig = ifelse(fit_p > p_value_lvl, "neutral", "selection"), # neutral if >0.05
           sig = ifelse(is.na(fit_p), "NA", sig)  # missing values
         )
-    }
-    
+  
     # p-value count
     fit_p_count[[run]] <- fit_results$fit_p
     
     this_fit <- fit_results %>% 
-      filter(variant == sel_variant_snap) # call the focal variant
+      filter(variant == sel_variant_ta) # call the focal variant
     
     # Avoid length-zero 
     p_value <- this_fit$fit_p[1] 
@@ -183,14 +180,14 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
     ) 
     
     # Store both across runs
-    results_snap$fit_p[run]  <- p_value
-    results_snap$inference[run] <- inf
+    results_ta$fit_p[run]  <- p_value
+    results_ta$inference[run] <- inf
   }
   
-  # Summarise output
-  sel <- sum(results_snap$inference == "selection", na.rm = T)
-  neut <- sum(results_snap$inference == "neutral", na.rm = T)
-  sumNA <- sum(is.na(results_snap$inference))
+  # Compute output
+  sel <- sum(results_ta$inference == "selection", na.rm = T)
+  neut <- sum(results_ta$inference == "neutral", na.rm = T)
+  sumNA <- sum(is.na(results_ta$inference))
   
   SSR <- sel / (n_runs - sumNA)
   FNR <- neut / (n_runs - sumNA)
@@ -199,7 +196,7 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
   
   # Export output
   return(list(
-    sel_variant_snap = sel_variant_snap, # variant
+    sel_variant_ta = sel_variant_ta, # focal variant
     
     # parameters
     N = N,
@@ -209,6 +206,8 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
     timesteps = timesteps,
     p_value_lvl = p_value_lvl,
     n_runs = n_runs,
+    time_window = time_window,
+    inject_fvar = inject_fvar,
     
     # outputs
     all_pvals = all_pvals,
@@ -218,30 +217,33 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
     proportionNA = proportionNA,
     fit_p_count = fit_p_count,
     fit_results = fit_results, # global results
-    results_snap = results_snap # focal variant results
-  )
+    results_ta = results_ta # focal variant results
+    )
   )
 }
 
+
 # BASELINE SIMULATION
-cb_snap_sim <- content_bias_snapshot(N = 100, mu = 0.02, burnin = 500, b = 0.25,
-                                     timesteps = 100, p_value_lvl = 0.05, n_runs = 100)
+cb_ta_sim <- content_bias_ta(N = 100, mu = 0.02, burnin = 1000, b = 0.2,
+                               timesteps = 1000, p_value_lvl = 0.05,n_runs = 5,
+                               time_window = 20)
 
 # Store output across runs in a table
-results_table_cb_snapshot <- tibble(
-  N  = cb_snap_sim$N,
-  "µ" = cb_snap_sim$mu,
-  b = cb_snap_sim$b,
-  "Burn-in" = cb_snap_sim$burnin,
-  "Time steps" = cb_snap_sim$timesteps,
-  "α" = cb_snap_sim$p_value_lvl,
-  SSR = cb_snap_sim$SSR,
-  FNR = cb_snap_sim$FNR,
-  proportionNA = cb_snap_sim$proportionNA,
-  "Runs" = cb_snap_sim$n_runs
+results_table_cb_ta <- tibble(
+  N  = cb_ta_sim$N,
+  "µ" = cb_ta_sim$mu,
+  b = cb_ta_sim$b,
+  "Burn-in" = cb_ta_sim$burnin,
+  "Time steps" = cb_ta_sim$timesteps,
+  "α" = cb_ta_sim$p_value_lvl,
+  "w" = cb_ta_sim$time_window,
+  SSR = cb_ta_sim$SSR,
+  FNR = cb_ta_sim$FNR,
+  proportionNA = cb_ta_sim$proportionNA,
+  "Runs" = cb_ta_sim$n_runs
 )
-
-print(results_table_cb_snapshot)
+print(results_table_cb_ta)
+write_xlsx(results_table_cb_ta, "cb_ta_output/cb_ta_baseline.xlsx")
 
 
 # Add this to examine how many variants were injected
@@ -249,9 +251,8 @@ print(results_table_cb_snapshot)
 message(sprintf("[Diagnostics] inject_fvar = %d (override=%s)",
                 inject_fvar, ifelse(is.null(inject_override), "F", "T")))
 
-
 # ADD THIS TO EXAMINE FREQUENCIES FOR EACH RUN (best when low n_runs)
 # Add it just before "# Prepare FIT input"
-fv <- freq_mat[, as.character(sel_variant_snap)]
+fv <- freq_mat[, as.character(sel_variant_ta)]
 message(sprintf("Run %d: focal counts first 20 gens = %s", run,
                 paste(head(fv,20), collapse=",")))

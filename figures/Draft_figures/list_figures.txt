@@ -1,0 +1,44 @@
+V fig. 1: Application of FIT to LBK Merzbach
+
+v fig 2: expected linear relationship for neutral model
+
+v fig 3a & b: initial frequencies in neutral evolutions (N = 100, mu = 0.02, timesteps = 100)
+
+fig 4: mu sweeps within neutral model
+
+V fig 5: expected R curve for content bias, with different b sweeps
+
+fig 6: interaction between N and content bias
+
+v fig 7: conformist bias sweep curve
+
+v fig 8: snapshot sampling frequency distribution
+
+v fig 9: time averaging sampling frequency distribution
+
+v fig 10: power curve
+
+v fig 11a: baseline NDR snap histogram NA
+v fig 11b: baseline NDR snap histogram non-NA
+
+v fig 12: %NA against runs
+
+v fig 13: mu sweeps
+
+v fig 14: N sweeps
+
+v fig 15: time sweeps
+
+v fig 16: baseline NDR ta histogram
+
+v fig 17: mu sweeps
+
+v fig 18: N sweeps
+
+v fig 19: time sweeps
+
+v fig 20: tw sweeps
+
+
+
+

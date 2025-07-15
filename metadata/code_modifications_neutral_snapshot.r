@@ -397,3 +397,20 @@ print(all_results_neutral_snapshot)
 
 # Export table
 write_xlsx(all_results_neutral_snapshot, "neutral_snapshot_results.xlsx")
+
+# FPR storing (TO ADD TO GITHUB)
+accuracy_snapshot <- numeric(n_runs) # empty vector for accuracy tracking each run
+FPR_snapshot <- numeric(n_runs)
+fit_p_count <- vector("list", n_runs) # store p-values
+
+# Total variants = non-NA 
+total_variants <- sum(fit_results$sig != "NA")
+
+# FPR calculation
+accuracy_snapshot[run] <- NDR  # track for each run
+FPR_snapshot[run] <- FPR
+# Store results
+  mean_accuracy <- mean(accuracy_snapshot, na.rm = TRUE) # mean accuracy across runs
+  high_accuracy_runs <- sum(accuracy_snapshot >= 0.95) / n_runs * 100
+  mean_FPR <- mean(FPR_snapshot, na.rm = TRUE)
+

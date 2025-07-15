@@ -1,5 +1,5 @@
 #########################################################
-################ CONTENT BIAS SNAPSHOT ##################
+############## CONFORMIST BIAS SNAPSHOT #################
 #########################################################
 
 # Reading packages
@@ -14,31 +14,25 @@ lapply(pkgs, library, character.only = TRUE)
 pak::pkg_install("benmarwick/signatselect")
 library(signatselect)
 
-# Modeled as in Boyd & Richerson (1985, p. 140)
+# Modeled as in Boyd & Richerson (1985)
 
 # PARAMETERS -----------------------------------------------------------------
 # N = Number of individuals
 # mu = innovation rate (between 0 and 1, inclusive)
-# b = direct/content bias
+# c = conformist bias
 # a = normalized weight (1 + b)
 # burnin = number of initial steps (iterations) discarded
 # timesteps = actual number of time steps or "generations" after the burn-in
 # p_value_lvl = Significance level
 # n_runs = number of test runs
 
+
 set.seed(1234)
 
+
 # PIPELINE -------------------------------------------------------------------
-content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
-                                  p_value_lvl, n_runs,
-                                  p_extinct = 0.05, inject_override=NULL) {
-  
-  # compute minimal inject count to ensure focal survives >= 3 time points
-  if (is.null(inject_override)) {
-    inject_fvar <- ceiling(N * (1 - p_extinct^(1 / (2 * N))))
-  } else {
-    inject_fvar <- inject_override
-  }
+conformist_bias_snapshot <- function(N, mu, c, burnin, timesteps,
+                                     p_value_lvl, n_runs) {
   
   # Table to store results for the focal variant 
   results_snap <- tibble(
@@ -71,21 +65,23 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
       }
     }
     
-    # Define focal variant label after burn-in to avoid innovation collision
-    sel_variant_snap <- maxtrait + 1
+    # Define focal variant as the most common
+    tab <- table(pop)
+    sel_variant_snap <- as.integer(names(tab)[ which.max(tab) ])
     results_snap$variant[run] <- sel_variant_snap
     
-    # Inject focal variant in t = 1
-    pop[1:inject_fvar] <- sel_variant_snap        
-    maxtrait  <- sel_variant_snap
+    # record t = 1
     traitmatrix[1, ] <- pop 
     
     # Observation period after equilibrium
     for (gen in 2:timesteps) {
       
-      # apply content biased transmission
-      a <- ifelse(pop == sel_variant_snap, 1 + b, 1) # selected variant weighs 1 + s, neutral = 1
-      pop <- sample(pop,replace=T,prob = a) # add the weights as probabilities
+      # conformist biased transmission
+      counts <- tabulate(pop, nbins = maxtrait) # get counts for all variants
+      w_var <- counts^(1 + c) # assign normalized weight to all variants:
+      a <- w_var[pop] # give each individual its variant's weight
+      # sample next generation
+      pop <- sample(pop,N,replace=T,prob = a) # add the weights as probabilities
       
       # Neutral innovation
       innovate <- which(runif(N)<mu) 
@@ -104,8 +100,6 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
       as.numeric(tab) / N # counts to frequencies
     }))
     colnames(freq_mat) <- as.character(unique_variants) # give names
-    
-    # DIAGNOSTIC: check focal frequencies
     
     # Prepare FIT input
     freq_long <- as_tibble(freq_mat) %>%
@@ -204,7 +198,7 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
     # parameters
     N = N,
     mu = mu,
-    b = b,
+    c = c,
     burnin = burnin,
     timesteps = timesteps,
     p_value_lvl = p_value_lvl,
@@ -224,30 +218,25 @@ content_bias_snapshot <- function(N, mu, b, burnin, timesteps,
 }
 
 # BASELINE SIMULATION
-cb_snap_sim <- content_bias_snapshot(N = 100, mu = 0.02, burnin = 500, b = 0.25,
-                                     timesteps = 100, p_value_lvl = 0.05, n_runs = 100)
+conf_snap_sim <- conformist_bias_snapshot(N = 2000, mu = 0.02, burnin = 1000, c = 0.1,
+                                          timesteps = 10, p_value_lvl = 0.05, n_runs = 100)
 
 # Store output across runs in a table
-results_table_cb_snapshot <- tibble(
-  N  = cb_snap_sim$N,
-  "µ" = cb_snap_sim$mu,
-  b = cb_snap_sim$b,
-  "Burn-in" = cb_snap_sim$burnin,
-  "Time steps" = cb_snap_sim$timesteps,
-  "α" = cb_snap_sim$p_value_lvl,
-  SSR = cb_snap_sim$SSR,
-  FNR = cb_snap_sim$FNR,
-  proportionNA = cb_snap_sim$proportionNA,
-  "Runs" = cb_snap_sim$n_runs
+results_table_conf_snapshot <- tibble(
+  N  = conf_snap_sim$N,
+  "µ" = conf_snap_sim$mu,
+  c = conf_snap_sim$c,
+  "Burn-in" = conf_snap_sim$burnin,
+  "Time steps" = conf_snap_sim$timesteps,
+  "α" = conf_snap_sim$p_value_lvl,
+  SSR = conf_snap_sim$SSR,
+  FNR = conf_snap_sim$FNR,
+  proportionNA = conf_snap_sim$proportionNA,
+  "Runs" = conf_snap_sim$n_runs
 )
 
-print(results_table_cb_snapshot)
-
-
-# Add this to examine how many variants were injected
-# Add at the beginning of the function
-message(sprintf("[Diagnostics] inject_fvar = %d (override=%s)",
-                inject_fvar, ifelse(is.null(inject_override), "F", "T")))
+print(results_table_conf_snapshot)
+write_xlsx(results_table_conf_snapshot, "tables/conf_snap_output/conf_snap_baseline.xlsx")
 
 
 # ADD THIS TO EXAMINE FREQUENCIES FOR EACH RUN (best when low n_runs)
