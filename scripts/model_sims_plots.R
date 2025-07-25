@@ -192,59 +192,79 @@ ggplot(neutral_df, aes(x = freq, y = probability)) +
 # FIGURES 3a & 3b --------------------------------------------------------------
 
 # FIGURE 3a
-neutral_snapshot_fig <- function(N, mu, timesteps,n_variants, n_runs) {
-  
-  all_runs <- vector("list", n_runs)
-  ini <- seq_len(n_variants) # Initial cultural variants
+neutral_snapshot <- function(N, mu, timesteps, p_value_lvl, n_runs) {
+  runs <- vector("list", length = n_runs)
   
   for (run in 1:n_runs) {
-    traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Matrix of population
-    pop <- ini # initial population of variants to pop
+    # Initialize population: 33% start with variant 1, others have unique variants
+    initial_variant_count <- round(N * 0.33)
+    pop <- c(rep(1, initial_variant_count), 2:(N - initial_variant_count + 1))
     
-    for(t in 2:timesteps) {
-      pop <- sample(ini, N, replace = TRUE) # neutrality
-      innovate <- which(runif(N) < mu) # random innovation
-      if(length(innovate)) {
-        pop[innovate] <- sample(ini, length(innovate), replace = TRUE) 
+    traitmatrix <- matrix(NA, nrow = timesteps, ncol = N)
+    maxtrait <- max(pop)
+    
+    for (i in 1:timesteps) {
+      pop <- sample(pop, replace = TRUE)  # Neutral drift
+      innovate <- which(runif(N) < mu)
+      if (length(innovate) > 0) {
+        new_variants <- (maxtrait + 1):(maxtrait + length(innovate))
+        pop[innovate] <- new_variants
+        maxtrait <- max(pop)
       }
-      traitmatrix[t, ] <- pop
+      traitmatrix[i, ] <- pop
     }
-
-    # Trait matrix to frequency matrix
-    freq_mat <- t(apply(traitmatrix, 1, function(row) {
-      tab <- table(factor(row, levels = ini)) 
-      as.numeric(tab)/N # Convert to frequencies
-    }))
-    colnames(freq_mat) <- as.character(ini)
-    df_long <- as.data.frame(freq_mat) %>%
-      mutate(time = seq_len(nrow(freq_mat)),
-             run  = run) %>%
-      pivot_longer(cols = -c(time, run),
-                   names_to = "variant",
-                   values_to = "frequency")
-    all_runs[[run]] <- df_long
+    
+    # Track ONLY variant 1 (initial frequency = 0.33)
+    freq_variant1 <- rowMeans(traitmatrix == 1, na.rm = TRUE)
+    
+    runs[[run]] <- data.frame(
+      time = 1:timesteps,
+      freq = freq_variant1,
+      run = run,
+      N = N,
+      mu = mu,
+      p_value_lvl = p_value_lvl,
+      variant = "Variant 1 (Initial freq = 0.33)"
+    )
   }
-  bind_rows(all_runs)
+  bind_rows(runs)
 }
 
+n_snap_N_params <- list(
+  list(N=10, mu=0,timesteps=200, p_value_lvl=0.05, n_runs=4),
+  list(N=50, mu=0,timesteps=200, p_value_lvl=0.05, n_runs=4),
+  list(N=100, mu=0,timesteps=200, p_value_lvl=0.05, n_runs=4),
+  list(N=250, mu=0,timesteps=200, p_value_lvl=0.05, n_runs=4),
+  list(N=500, mu=0,timesteps=200, p_value_lvl=0.05, n_runs=4),
+  list(N=1000, mu=0,timesteps=200, p_value_lvl=0.05, n_runs=4)
+)
 
-neutral_sim_fig <- neutral_snapshot_fig(N = 100, mu = 0.02, timesteps = 100, 
-                                        n_runs = 1, n_variants = 6)
+# Run all simulations and bind into one big tibble
+all_results <- map_dfr(n_snap_N_params, ~
+                         neutral_snapshot(.x$N, .x$mu, .x$timesteps, 
+                                          .x$p_value_lvl, .x$n_runs))
 
+ggplot(all_results, aes(x = time, y = freq, color = factor(run))) +
+  geom_line(size = 1, alpha = 0.8) +
+  geom_hline(yintercept = 0.33, linetype = "dashed", color = "gray30", size = 0.8) +
+  facet_wrap(~ N, scales = "fixed", ncol = 3) +
+  scale_color_brewer(palette = "Set1", name = "Run") +
+  labs(
+    x = "Time Step",
+    y = "Frequency"
+  ) +
+  theme_minimal(base_size = 20) +  # Base font size increased to 20
+  theme(
+    axis.title.x = element_text(size = 22, margin = margin(t = 10)),  # Larger X-axis label
+    axis.title.y = element_text(size = 22, margin = margin(r = 10)),  # Larger Y-axis label
+    axis.text = element_text(size = 18),  # Larger tick labels
+    strip.text = element_text(size = 20, face = "bold"),  # Larger facet labels
+    legend.title = element_text(size = 20),  # Larger legend title
+    legend.text = element_text(size = 18),  # Larger legend labels
+    legend.position = "bottom",
+    panel.spacing = unit(1.5, "lines")  # Extra space between facets
+  )
 
-ggplot(neutral_sim_fig, aes(x = time, y = frequency,
-                              group  = interaction(variant, run),
-                              colour = variant)) +
-    geom_line(linewidth = 0.8) +
-    ylim(c(0, 0.4)) +
-    scale_colour_viridis_d(name = "Variant") +
-    theme_minimal() +
-    theme(axis.title = element_text(size = 18),
-          strip.text = element_text(size = 16),
-          legend.title = element_text(size = 18),
-          legend.text = element_text(size = 18)) +
-    labs(x = "Time step", y = "Relative frequency") +
-  facet_wrap(~ variant, ncol = 2)
 
 # FIGURE 3b
 n_snap_init_freq <- function(N, mu, timesteps,n_variants, n_runs) {
@@ -309,58 +329,53 @@ ggplot(neutral_sim_init_freq, aes(x = time, y = frequency,
 
 
 # CONTENT BIASED TRANSMISSION
-# FIGURES 5a and 5b ------------------------------------------------------------
-
-# FIGURE 5a
+# FIGURE 4 ------------------------------------------------------------
 # Build a data.frame of x, y and all b‐values
 df <- tibble(x = 1:100) %>%
-  mutate(y = 100 - x) %>%
+  mutate(x_scaled = x/100, y = 100 - x) %>%
   crossing(b = seq(0.2, 1.4, by = 0.2)) %>%
-  mutate(p = x*(1 + b) / ( x*(1 + b) + y ))
+  mutate(p = x*(1 + b) / (x*(1 + b) + y))
 
-# Separate neutral for dashed line
-df_neutral <- tibble(x = 1:100, p = (1:100)/100)
+df_neutral <- tibble(x_scaled = seq(0, 1, length.out = 100), 
+                     p = seq(0, 1, length.out = 100))
 
-# Plot
-ggplot(df, aes(x = x, y = p, color = as.factor(b))) +
-  # biased curves
-  geom_line(size = 1) +
-  # neutral curve
-  geom_line(data = df_neutral, aes(x = x, y = p),
-            linetype = "dashed", color = "black", size = 1) +
-  # scales & labels
-  scale_color_viridis_d(name = "Content bias (b)",
-                        option = "D") +
-  labs(
-    x = "Frequency of variant",
-    y = "Probability of adoption") +
+ggplot(df, aes(x = x_scaled, y = p, color = as.factor(b))) +
+  geom_line(linewidth = 1) +
+  geom_line(data = df_neutral,
+            aes(x = x_scaled, y = p),
+            linetype = "dashed",
+            color = "black",
+            linewidth = 1) +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_color_viridis_d(name = "b") +
+  labs(x = "Frequency of Variant",
+       y = "Adoption probability (p)") +
   theme_minimal(base_size = 14) +
-  theme(
-    axis.title = element_text(size = 18),
-    axis.text = element_text(size = 16),
-    legend.title = element_text(size = 18),
-    legend.text = element_text(size = 16),
-    legend.position  = "top"
-  )
+  theme(legend.position = "top",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 16),
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 16),
+        panel.grid.minor = element_blank())
 
-# FIGURE 5b
+# FIGURE 5 ---------------------------------------------------------------------
 df_negative <- tibble(x = 1:100) %>%
-  mutate(y = 100 - x) %>%
+  mutate(x_scaled = x/100, y = 100 - x) %>%
   crossing(b = seq(-1, -0.2, by = 0.2)) %>%
   mutate(p = x*(1 + b) / ( x*(1 + b) + y ))
 
 # Plot
-ggplot(df_negative, aes(x = x, y = p, color = as.factor(b))) +
+ggplot(df_negative, aes(x = x_scaled, y = p, color = as.factor(b))) +
   # biased curves
   geom_line(size = 1) +
   # neutral curve
-  geom_line(data = df_neutral, aes(x = x, y = p),
+  geom_line(data = df_neutral, aes(x = x_scaled, y = p),
             linetype = "dashed", color = "black", size = 1) +
   # scales & labels
   scale_color_viridis_d(name = "Content bias (b)",
                         option = "D") +
   labs(
-    x = "Frequency of variant",
+    x = "Frequency of Variant",
     y = "Probability of adoption") +
   theme_minimal(base_size = 14) +
   theme(
@@ -371,21 +386,21 @@ ggplot(df_negative, aes(x = x, y = p, color = as.factor(b))) +
     legend.position  = "top"
   )
 
-# FIGURE 7 ---------------------------------------------------------------------
+# FIGURE 6 ---------------------------------------------------------------------
 dff <- tibble(x = 1:100) %>%
-  mutate(y = 100 - x) %>%
+  mutate(x_scaled = x/100, y = 100 - x) %>%
   crossing(b = seq(-1, 1.4, by = 0.2)) %>%
   mutate(p = x^(1 + b) / ( x^(1 + b) + y ))
 
 # Separate neutral for dashed line
-df_neutral <- tibble(x = 1:100, p = (1:100)/100)
-
+df_neutral <- tibble(x_scaled = seq(0, 1, length.out = 100), 
+                     p = seq(0, 1, length.out = 100))
 # Plot
-ggplot(dff, aes(x = x, y = p, color = as.factor(b))) +
+ggplot(dff, aes(x = x_scaled, y = p, color = as.factor(b))) +
   # biased curves
   geom_line(size = 1) +
   # neutral curve
-  geom_line(data = df_neutral, aes(x = x, y = p),
+  geom_line(data = df_neutral, aes(x = x_scaled, y = p),
             linetype = "dashed", color = "black", size = 1) +
   # scales & labels
   scale_color_viridis_d(name = "Conformist bias (c)",
@@ -402,131 +417,184 @@ ggplot(dff, aes(x = x, y = p, color = as.factor(b))) +
     legend.position  = "top"
   )
 
-# FIGURE 8 ---------------------------------------------------------------------
-neutral_snapshot_fig <- function(N, mu, timesteps,n_variants, n_runs) {
+# FIGURE 7 ---------------------------------------------------------------------
+neutral_snapshot_fig <- function(N, mu, burnin, timesteps, n_variants = 4, n_runs) {
   
   all_runs <- vector("list", n_runs)
-  ini <- seq_len(n_variants) # Initial cultural variants
   
   for (run in 1:n_runs) {
-    traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Matrix of population
-    pop <- ini # initial population of variants to pop
+    ini <- 1:n_variants # initial variants
+    traitmatrix <- matrix(NA, nrow = timesteps, ncol = N)
     
-    for(t in 2:timesteps) {
-      pop <- sample(ini, N, replace = TRUE) # neutrality
-      innovate <- which(runif(N) < mu) # random innovation
-      if(length(innovate)) {
-        pop[innovate] <- sample(ini, length(innovate), replace = TRUE) 
+    # Create initial population with EXACT equal frequencies
+    pop <- rep(ini, each = N/n_variants)[1:N] # Perfect 0.25 each
+    
+    # Burn-in stage - no recording
+    for(i in 1:burnin) {
+      # Neutral transmission with frequency correction
+      current_freqs <- tabulate(pop, nbins = n_variants)/N
+      weights <- (1/current_freqs)[pop] # Inverse frequency weighting
+      pop <- sample(pop, size = N, replace = TRUE, prob = weights)
+      
+      # Innovation with equal probability for all variants
+      innovate <- which(runif(N) < mu)
+      if(length(innovate) > 0) {
+        pop[innovate] <- sample(ini, length(innovate), 
+                                replace = TRUE, 
+                                prob = rep(0.25, n_variants))
       }
-      traitmatrix[t, ] <- pop
     }
     
-    # Trait matrix to frequency matrix
+    # Observation period after equilibrium
+    for (t in 1:timesteps) {
+      # Frequency-corrected sampling
+      current_freqs <- tabulate(pop, nbins = n_variants)/N
+      weights <- (1/current_freqs)[pop]
+      pop <- sample(pop, size = N, replace = TRUE, prob = weights)
+      
+      # Balanced innovation
+      innovate <- which(runif(N) < mu)
+      if(length(innovate) > 0) {
+        pop[innovate] <- sample(ini, length(innovate), 
+                                replace = TRUE,
+                                prob = rep(0.25, n_variants))
+      }
+      
+      traitmatrix[t,] <- pop # record the variants
+    }
+    
+    # Calculate frequencies
     freq_mat <- t(apply(traitmatrix, 1, function(row) {
-      tab <- table(factor(row, levels = ini)) 
-      as.numeric(tab)/N # Convert to frequencies
+      tab <- table(factor(row, levels = ini))
+      as.numeric(tab)/N
     }))
     colnames(freq_mat) <- as.character(ini)
+    
+    # Convert to long format
     df_long <- as.data.frame(freq_mat) %>%
       mutate(time = seq_len(nrow(freq_mat)),
-             run  = run) %>%
+             run = run) %>%
       pivot_longer(cols = -c(time, run),
                    names_to = "variant",
                    values_to = "frequency")
+    
     all_runs[[run]] <- df_long
   }
   bind_rows(all_runs)
 }
 
 
-neutral_snap_traj <- neutral_snapshot_fig(N = 100, mu = 0.02, timesteps = 200, 
-                                        n_runs = 1, n_variants = 4)
+neutral_snap_traj <- neutral_snapshot_fig(N = 100, mu = 0.02, burnin = 200,
+                                          timesteps = 200, n_runs = 1)
 
 ggplot(neutral_snap_traj, aes(x = time, y = frequency,
-                            group  = interaction(variant, run),
-                            colour = variant)) +
+                            group  = interaction(variant, run))) +
   geom_line(linewidth = 0.8) +
   ylim(c(0, 0.4)) +
-  scale_colour_viridis_d(name = "Variant") +
   theme_minimal() +
   theme(axis.title = element_text(size = 18),
         strip.text = element_text(size = 16),
-        legend.title = element_text(size = 18),
-        legend.text = element_text(size = 18)) +
-  labs(x = "Time step", y = "Relative frequency") +
+        axis.text = element_text(size = 18)) +
+  labs(x = "Time step", y = "Frequency") +
   facet_wrap(~ variant, ncol = 2)
 
-# FIGURE 9 ---------------------------------------------------------------------
-neutral_ta_fig <- function(N, mu, timesteps,n_variants, n_runs, time_window) {
+# FIGURE 8 ---------------------------------------------------------------------
+neutral_ta_fig <- function(N, mu, burnin, timesteps, n_variants = 4, n_runs,
+                           time_window = 20) {
   
   all_runs <- vector("list", n_runs)
-  ini <- seq_len(n_variants) # Initial cultural variants
   
   for (run in 1:n_runs) {
-    traitmatrix <- matrix(NA,nrow=timesteps,ncol=N) # Matrix of population
-    pop <- sample(ini, N, replace = TRUE) # initial population
-    traitmatrix[1, ] <- pop
+    ini <- 1:n_variants # initial variants
+    traitmatrix <- matrix(NA, nrow = timesteps, ncol = N)
     
+    # Create initial population with EXACT equal frequencies
+    pop <- rep(ini, each = N/n_variants)[1:N] # Perfect 0.25 each
     
-    for(t in 2:timesteps) {
-      pop <- sample(ini, N, replace = TRUE) # neutrality
-      innovate <- which(runif(N) < mu) # random innovation
-      if(length(innovate)) {
-        pop[innovate] <- sample(ini, length(innovate), replace = TRUE) 
+    # Burn-in stage - no recording
+    for(i in 1:burnin) {
+      # Neutral transmission with frequency correction
+      current_freqs <- tabulate(pop, nbins = n_variants)/N
+      weights <- (1/current_freqs)[pop] # Inverse frequency weighting
+      pop <- sample(pop, size = N, replace = TRUE, prob = weights)
+      
+      # Innovation with equal probability for all variants
+      innovate <- which(runif(N) < mu)
+      if(length(innovate) > 0) {
+        pop[innovate] <- sample(ini, length(innovate), 
+                                replace = TRUE, 
+                                prob = rep(0.25, n_variants))
       }
-      traitmatrix[t, ] <- pop
+    }
+    
+    # Observation period after equilibrium
+    for (t in 2:timesteps) {
+      # Frequency-corrected sampling
+      current_freqs <- tabulate(pop, nbins = n_variants)/N
+      weights <- (1/current_freqs)[pop]
+      pop <- sample(pop, size = N, replace = TRUE, prob = weights)
+      
+      # Balanced innovation
+      innovate <- which(runif(N) < mu)
+      if(length(innovate) > 0) {
+        pop[innovate] <- sample(ini, length(innovate), 
+                                replace = TRUE,
+                                prob = rep(0.25, n_variants))
+      }
+      
+      traitmatrix[t,] <- pop # record the variants
     }
     
     # Time averaging step
-    n_bins <- floor(timesteps / time_window) # round down to nearest whole number
+    n_bins <- floor(timesteps / time_window)
+    bin_labels <- 1:n_bins  # Integer bin numbers
     
     averaged_samples <- lapply(seq_len(n_bins), function(j) {
       rows <- ((j - 1) * time_window + 1):(j * time_window)
       as.vector(traitmatrix[rows, ])
     })
+    
     unique_variants <- sort(unique(unlist(averaged_samples)))
     freq_mat <- t(sapply(averaged_samples, function(x) {
-      tab  <- table(factor(x, levels = unique_variants))
+      tab <- table(factor(x, levels = ini))  # Track only original variants
       as.numeric(tab) / (N * time_window)
     }))
-    colnames(freq_mat) <- as.character(unique_variants)
+    colnames(freq_mat) <- as.character(ini)
     
-    # Convert to long format
+    # Convert to long format with integer bins
     df_long <- as.data.frame(freq_mat) %>%
-      mutate(bin = seq_len(nrow(freq_mat)),
-             run  = run) %>%
+      mutate(bin = bin_labels,  # Use integer sequence
+             run = run) %>%
       pivot_longer(cols = -c(bin, run),
                    names_to = "variant",
                    values_to = "frequency")
+    
     all_runs[[run]] <- df_long
   }
   bind_rows(all_runs)
 }
 
-
-neutral_ta_traj <- neutral_ta_fig(N = 100, mu = 0.02, timesteps = 100, 
-                                  n_runs = 1, n_variants = 4,
-                                  time_window = 5)
+neutral_ta_traj <- neutral_ta_fig(N = 100, mu = 0.02, burnin = 200,
+                                  timesteps = 200, 
+                                  n_runs = 1, time_window = 20)
 
 ggplot(neutral_ta_traj, aes(x = bin, y = frequency,
-                              group  = interaction(variant, run),
-                              colour = variant)) +
+                            group = interaction(variant, run))) +
   geom_line(linewidth = 0.8) +
+  scale_x_continuous(breaks = scales::pretty_breaks(),  # Integer breaks
+                     labels = scales::number_format(accuracy = 1)) +  # No decimals
   ylim(c(0, 0.4)) +
-  scale_colour_viridis_d(name = "Variant") +
   theme_minimal() +
-  theme(axis.title = element_text(size = 18),
-        strip.text = element_text(size = 16),
-        legend.title = element_text(size = 18),
-        legend.text = element_text(size = 18)) +
-  labs(x = "Time step", y = "Relative frequency") +
+  theme(axis.title = element_text(size = 20),
+        strip.text = element_text(size = 18),
+        axis.text = element_text(size = 18)) +
+  labs(x = "Time bin", y = "Frequency") + 
   facet_wrap(~ variant, ncol = 2)
 
 
-# FIGURE 10 - BORROWED FROM FEDER ET AL. (2014)
-# FIGURES 11a & 11b ------------------------------------------------------------
+# FIGURE 9 - BORROWED FROM FEDER ET AL. (2014) ---------------------------------
+# FIGURE 10 --------------------------------------------------------------------
 
-# FIGURE 11a
 # Import results from baseline simulation
 baseline_df <- read_excel("tables/n_snap_output/n_snap_baseline.xlsx")
 glimpse(baseline_df)
@@ -552,7 +620,7 @@ ggplot(baseline_df, aes(x = NDR)) +
     axis.text = element_text(size = 16),
     plot.caption = element_text(size = 14))
 
-# FIGURE 11b
+# FIGURE 11 ---------------------------------------------------------------------
 # RUN NEUTRAL SNAPSHOT COUNTING NAs WHEN COMPUTING NDR
 neutral_snapshot_NA <- function(N, mu, burnin, timesteps, p_value_lvl, n_runs) {
   
@@ -747,7 +815,6 @@ max_prop <- max(na_by_run$propNA)
 ggplot(na_by_run, aes(x = run, y = propNA)) +
   geom_area(fill = "skyblue", alpha = 0.3) +
   geom_line(color = "#2C3E50", size = 1) +
-  geom_point(aes(color = propNA), size = 3) +
   scale_color_viridis(option = "C",name = "% missing",
                       labels = function(x) paste0(x, "%")) +
   annotate("text", x = max_idx, y = max_prop,
