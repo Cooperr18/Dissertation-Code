@@ -1,7 +1,5 @@
 # Beyond the Signals: An evaluation of the Signal Selection Test using simulated data
 
-## R Markdown
-
 This repo includes all scripts, figures and tables created to carry out
 the analysis of my dissertation, within the framework of the MPhil in
 Human Evolutionary Studies at the University of Cambridge. The aim of
