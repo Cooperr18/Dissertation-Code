@@ -83,7 +83,7 @@ n_snap_N_x_time <- list(
   list(N=400, mu=0.05, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=1000),
   
   # high N x high t
-  list(N=400, mu=0.05, burnin=1000, timesteps=2000, p_value_lvl=0.05, n_runs=1000),
+  list(N=400, mu=0.05, burnin=1000, timesteps=2000, p_value_lvl=0.05, n_runs=1000)
 )
 
 
@@ -102,12 +102,15 @@ n_snap_mu_x_t <- list(
   list(N=100, mu=0.4, burnin=1000, timesteps=100, p_value_lvl=0.05, n_runs=1000),
   
   # high mu x high t
-  list(N=100, mu=0.4, burnin=1000, timesteps=2000, p_value_lvl=0.05, n_runs=1000),
+  list(N=100, mu=0.4, burnin=1000, timesteps=2000, p_value_lvl=0.05, n_runs=1000)
 )
 
 
 
 # Run and store
+
+library(purrr)
+library(tibble)
 
 # INNOVATION RATE (MU)
 n_snap_mu_results <- map_dfr(n_snap_mu_params, ~ {
