@@ -104,11 +104,11 @@ transmission models:
 Each experiment is paired with two temporal deposition schemes: a
 **snapshot** regime (fine-grained ideal deposition)
 
-<img src="man/figures/README-unnamed-chunk-1-1.png" width="100%" />
+<img src="man/figures/README-snapshot-1.png" width="100%" style="display: block; margin: auto;" />
 
 and **time-averaging** regime (coarse-grained, palimpsest deposition).
 
-<img src="man/figures/README-unnamed-chunk-2-1.png" width="100%" />
+<img src="man/figures/README-time-averaging-1.png" width="100%" style="display: block; margin: auto;" />
 
 ## Reproduce experiments
 
@@ -382,7 +382,7 @@ ggplot(df, aes(x = `mu`)) +
   )
 ```
 
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
+<img src="man/figures/README-neutral snap mu-1.png" width="100%" style="display: block; margin: auto;" />
 
 ### Experiment 1
 
@@ -512,7 +512,7 @@ ggplot(all_results, aes(x = time, y = freq, color = factor(run))) +
   )
 ```
 
-<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
+<img src="man/figures/README-unbiased transmission-1.png" width="100%" style="display: block; margin: auto;" />
 
 But in other figures the user will need to import the data from
 spreadsheets available at
@@ -551,7 +551,7 @@ ggplot(df, aes(x = N)) +
   )
 ```
 
-<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+<img src="man/figures/README-fig 15-1.png" width="100%" style="display: block; margin: auto;" />
 
 ## Final remark
 

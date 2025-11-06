@@ -84,7 +84,7 @@ We conduct two simulation-based experiments modelling cultural transmission. Bot
 
 Each experiment is paired with two temporal deposition schemes: a **snapshot** regime (fine-grained ideal deposition)
 
-```{r, echo=FALSE}
+```{r snapshot, fig.align='center', echo=FALSE}
 neutral_snapshot_fig <- function(N, mu, burnin, timesteps, n_variants = 4, n_runs) {
   
   all_runs <- vector("list", n_runs)
@@ -168,7 +168,7 @@ ggplot(neutral_snap_traj, aes(x = time, y = frequency,
 
 and **time-averaging** regime (coarse-grained, palimpsest deposition).
 
-```{r, echo=FALSE}
+```{r time-averaging, fig.align='center', echo=FALSE}
 neutral_ta_fig <- function(N, mu, burnin, timesteps, n_variants = 4, n_runs,
                            time_window = 20) {
   
@@ -495,7 +495,7 @@ write_xlsx(n_snap_mu_results, "tables/n_snap_output/n_snap_mu_params.xlsx") # mu
 
 And then plot the results (for a more detailed description of figure reproducibility, see [Further remarks](#Further-remarks)):
 
-```{r}
+```{r neutral snap mu, fig.align='center'}
 # import sweep
 n_snap_mu_df <- read_excel("tables/n_snap_output/n_snap_mu_params2.xlsx")
 df <- n_snap_mu_df
@@ -543,7 +543,7 @@ To provide full transparency of the decision-making process along the realizatio
 
 Furthermore, all listed figures can be found at [`model_sims_plots.R`](https://github.com/Cooperr18/Dissertation-Code/blob/master/scripts/model_sims_plots.R). It is a script that breaks down the code for each numbered figure in the dissertation. Again, to fully reproduce them the workflow should follow [Reproduce experiments](#Reproduce-experiments): store the model functions, the parameter combinations and run the functions for each set; store the output, and import using `read_excel()`. In some cases, referral to other scripts is not mandatory, as the functions are often included within this script. E.g.:
 
-```{r}
+```{r unbiased transmission, fig.align='center'}
 neutral_snapshot <- function(N, mu, timesteps, p_value_lvl, n_runs) {
   runs <- vector("list", length = n_runs)
   
@@ -620,7 +620,7 @@ ggplot(all_results, aes(x = time, y = freq, color = factor(run))) +
 
 But in other figures the user will need to import the data from spreadsheets available at [tables](https://github.com/Cooperr18/Dissertation-Code/tree/master/tables), with sub-folders for each one of the models:
 
-```{r}
+```{r fig 15, fig.align='center'}
 # FIGURE 15 --------------------------------------------------------------------
 n_snap_N_df <- read_excel("tables/n_snap_output/n_snap_N_params2.xlsx")
 df <- n_snap_N_df
