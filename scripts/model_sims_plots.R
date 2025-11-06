@@ -13,7 +13,10 @@ pkgs <- c(
   "readxl", "patchwork", "scales"
 )
 lapply(pkgs, library, character.only = TRUE)
+library(pak)
 
+pak::pkg_install("benmarwick/signatselect")
+pak::pkg_install("benmarwick/evoarchdata")
 library(signatselect)
 
 set.seed(1234)
@@ -869,352 +872,216 @@ ggplot(baseline_ta, aes(x = NDR)) +
 # import sweep
 n_snap_mu_df <- read_excel("tables/n_snap_output/n_snap_mu_params2.xlsx")
 df <- n_snap_mu_df
+df$`%NA` <- df$`%NA`/100
 
 # NDR
-p_ndr <- ggplot(df, aes(x = mu, y = NDR)) +
-  geom_line(color = "#440154FF", size = 1) +
-  geom_point(color = "#440154FF", size = 3) +
-  geom_text(aes(label = number(NDR, accuracy = 0.0001)),
-            vjust = -1.2, size = 4.25, colour = "#440154FF") +
-  scale_x_continuous(
-    name = expression(mu),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous(name = "NDR",
-                     limits = c(min(df$NDR) - 0.0005, max(df$NDR) + 0.0005),
-                     labels = number_format(accuracy = 0.0001)) +
-  theme_bw(base_size = 14) +
+ggplot(df, aes(x = `mu`)) +
+  geom_col(aes(y = `%NA`), fill = "grey80", width = 0.0125) +
+  geom_line(aes(y = NDR),   color = plasma(5)[4], linewidth = 1.2) +
+  geom_point(aes(y = NDR),  color = plasma(5)[4], size = 3) +
+  scale_x_continuous(name = expression(mu), breaks = pretty_breaks(8)) +
+  scale_y_continuous(
+    name     = "NA",
+    sec.axis = sec_axis(~ ., name = "NDR")) +
+  labs(
+    caption = paste0(
+      "Runs = ", 1000, "    |    ",
+      "Grey = NA, Orange = NDR")) +
+  theme_minimal(base_size = 14) +
   theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# PLOT %NA
-p_na <- ggplot(df, aes(x = mu, y = `%NA`)) +
-  geom_area(fill = "#21908CFF", alpha = 0.3) +
-  geom_line(color = "#21908CFF", size = 1) +
-  geom_point(color = "#21908CFF", size = 3) +
-  geom_text(aes(label = number(`%NA`, accuracy = 0.001)),
-            vjust = -1.2, size = 4.25, colour = "#21908CFF") +
-  scale_x_continuous(
-    name = expression(mu),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("%NA",
-                     labels = percent_format(scale = 1),
-                     limits = c(0, 50)) +
-  theme_bw(base_size = 14) +
-  theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_text(size = 22),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# Combine with a shared caption
-(p_ndr / p_na) +
-  plot_annotation(
-    caption = paste("Runs =", unique(df$Runs))) &
-  theme(plot.caption = element_text(size = 18, hjust = 1))
+    axis.title.y.left  = element_text(size = 20),
+    axis.title.y.right = element_text(size = 20),
+    axis.title.x = element_text(size = 20),
+    axis.text = element_text(size = 18),
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.caption = element_text(size = 20, hjust = 0)
+  )
 
 
 # FIGURE 15 --------------------------------------------------------------------
 n_snap_N_df <- read_excel("tables/n_snap_output/n_snap_N_params2.xlsx")
 df <- n_snap_N_df
+df$`%NA` <- df$`%NA`/100
 
 # NDR
-p_ndr <- ggplot(df, aes(x = N, y = NDR)) +
-  geom_line(color = "#440154FF", size = 1) +
-  geom_point(color = "#440154FF", size = 3) +
-  geom_text(aes(label = number(NDR, accuracy = 0.0001)),
-            vjust = -1.2, size = 4.25, colour = "#440154FF") +
-  scale_x_continuous(
-    name = expression(N),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("NDR",
-                     limits = c(min(df$NDR) - 0.0005, max(df$NDR) + 0.0005),
-                     labels = number_format(accuracy = 0.0001)) +
-  theme_bw(base_size = 14) +
+ggplot(df, aes(x = N)) +
+  geom_col(aes(y = `%NA`), fill = "grey80") +
+  geom_line(aes(y = NDR),   color = plasma(5)[4], linewidth = 1.2) +
+  geom_point(aes(y = NDR),  color = plasma(5)[4], size = 3) +
+  scale_x_continuous(name = "N", breaks = pretty_breaks(8)) +
+  scale_y_continuous(
+    name     = "NA",
+    sec.axis = sec_axis(~ ., name = "NDR")) +
+  labs(
+    caption = paste0(
+      "Runs = ", 1000, "    |    ",
+      "Grey = NA, Orange = NDR")) +
+  theme_minimal(base_size = 14) +
   theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# PLOT %NA
-p_na <- ggplot(df, aes(x = N, y = `%NA`)) +
-  geom_area(fill = "#21908CFF", alpha = 0.3) +
-  geom_line(color = "#21908CFF", size = 1) +
-  geom_point(color = "#21908CFF", size = 3) +
-  geom_text(aes(label = number(`%NA`, accuracy = 0.001)),
-            vjust = -1.2, size = 4.25, colour = "#21908CFF") +
-  scale_x_continuous(
-    name = expression(N),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("%NA",
-                     labels = percent_format(scale = 1),
-                     limits = c(0, 50)) +
-  theme_bw(base_size = 14) +
-  theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_text(size = 22),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# Combine with a shared caption
-(p_ndr / p_na) +
-  plot_annotation(
-    caption = paste("Runs =", unique(df$Runs))) &
-  theme(plot.caption = element_text(size = 18, hjust = 1))
-
+    axis.title.y.left  = element_text(size = 20),
+    axis.title.y.right = element_text(size = 20),
+    axis.title.x = element_text(size = 20),
+    axis.text = element_text(size = 18),
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.caption = element_text(size = 20, hjust = 0)
+  )
 
 # FIGURE 16 --------------------------------------------------------------------
 n_snap_time_df <- read_excel("tables/n_snap_output/n_snap_time_params2.xlsx")
 df <- n_snap_time_df
+df$`%NA` <- df$`%NA`/100
 
 # NDR
-p_ndr <- ggplot(df, aes(x = timesteps, y = NDR)) +
-  geom_line(color = "#440154FF", size = 1) +
-  geom_point(color = "#440154FF", size = 3) +
-  geom_text(aes(label = number(NDR, accuracy = 0.0001)),
-            vjust = -1.2, size = 4.25, colour = "#440154FF") +
-  scale_x_continuous(
-    name = expression(timesteps),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("NDR",
-                     limits = c(min(df$NDR) - 0.0005, max(df$NDR) + 0.0005),
-                     labels = number_format(accuracy = 0.0001)) +
-  theme_bw(base_size = 14) +
+ggplot(df, aes(x = timesteps)) +
+  geom_col(aes(y = `%NA`), fill = "grey80", width = 150) +
+  geom_line(aes(y = NDR),   color = plasma(5)[4], linewidth = 1.2) +
+  geom_point(aes(y = NDR),  color = plasma(5)[4], size = 3) +
+  scale_x_continuous(name = "Time steps", breaks = pretty_breaks(8)) +
+  scale_y_continuous(
+    name     = "NA",
+    sec.axis = sec_axis(~ ., name = "NDR")) +
+  labs(
+    caption = paste0(
+      "Runs = ", 1000, "    |    ",
+      "Grey = NA, Orange = NDR")) +
+  theme_minimal(base_size = 14) +
   theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# PLOT %NA
-p_na <- ggplot(df, aes(x = timesteps, y = `%NA`)) +
-  geom_area(fill = "#21908CFF", alpha = 0.3) +
-  geom_line(color = "#21908CFF", size = 1) +
-  geom_point(color = "#21908CFF", size = 3) +
-  geom_text(aes(label = number(`%NA`, accuracy = 0.001)),
-            vjust = -1.2, size = 4.25, colour = "#21908CFF") +
-  scale_x_continuous(
-    name = expression(timesteps),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("%NA",
-                     labels = percent_format(scale = 1),
-                     limits = c(0,50)) +
-  theme_bw(base_size = 14) +
-  labs(x = "Time series length (t)") +
-  theme(
-    panel.grid.minor = element_blank(),
+    axis.title.y.left  = element_text(size = 20),
+    axis.title.y.right = element_text(size = 20),
     axis.title.x = element_text(size = 20),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# Combine with a shared caption
-(p_ndr / p_na) +
-  plot_annotation(
-    caption = paste("Runs =", unique(df$Runs))) &
-  theme(plot.caption = element_text(size = 18, hjust = 1))
+    axis.text = element_text(size = 18),
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.caption = element_text(size = 20, hjust = 0)
+  )
 
 
 # FIGURE 17 --------------------------------------------------------------------
 n_ta_mu_df <- read_excel("tables/n_ta_output/n_ta_mu_params2.xlsx")
 df <- n_ta_mu_df
+df$`%NA` <- df$`%NA`/100
 
 # NDR
-p_ndr <- ggplot(df, aes(x = mu, y = NDR)) +
-  geom_line(color = "#440154FF", size = 1) +
-  geom_point(color = "#440154FF", size = 3) +
-  geom_text(aes(label = number(NDR, accuracy = 0.0001)),
-            vjust = -1.2, size = 4.25, colour = "#440154FF") +
-  scale_x_continuous(
-    name = expression(mu),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous(name = "NDR",
-                     limits = c(min(df$NDR) - 0.0005, max(df$NDR) + 0.0005),
-                     labels = number_format(accuracy = 0.0001)) +
-  theme_bw(base_size = 14) +
+ggplot(df, aes(x = mu)) +
+  geom_col(aes(y = `%NA`), fill = "grey80") +
+  geom_line(aes(y = NDR),   color = plasma(5)[1], linewidth = 1.2) +
+  geom_point(aes(y = NDR),  color = plasma(5)[1], size = 3) +
+  scale_x_continuous(name = expression(mu), breaks = pretty_breaks(8)) +
+  scale_y_continuous(
+    name     = "NA",
+    sec.axis = sec_axis(~ ., name = "NDR")) +
+  labs(
+    caption = paste0(
+      "Runs = ", 1000, "    |    ",
+      "Grey = NA, Purple = NDR")) +
+  theme_minimal(base_size = 14) +
   theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
+    axis.title.y.left  = element_text(size = 20),
+    axis.title.y.right = element_text(size = 20),
+    axis.title.x = element_text(size = 20),
+    axis.text = element_text(size = 18),
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.caption = element_text(size = 20, hjust = 0)
+  )
 
-# PLOT %NA
-p_na <- ggplot(df, aes(x = mu, y = `%NA`)) +
-  geom_area(fill = "#21908CFF", alpha = 0.3) +
-  geom_line(color = "#21908CFF", size = 1) +
-  geom_point(color = "#21908CFF", size = 3) +
-  geom_text(aes(label = number(`%NA`, accuracy = 0.001)),
-            vjust = -1.2, size = 4.25, colour = "#21908CFF") +
-  scale_x_continuous(
-    name = expression(mu),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("%NA",
-                     labels = percent_format(scale = 1),
-                     limits = c(0, 50)) +
-  theme_bw(base_size = 14) +
-  theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_text(size = 22),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# Combine with a shared caption
-(p_ndr / p_na) +
-  plot_annotation(
-    caption = paste("Runs =", unique(df$Runs))) &
-  theme(plot.caption = element_text(size = 18, hjust = 1))
 
 # FIGURE 18 --------------------------------------------------------------------
 n_ta_N_df <- read_excel("tables/n_ta_output/n_ta_N_params2.xlsx")
 df <- n_ta_N_df
+df$`%NA` <- df$`%NA`/100
 
 # NDR
-p_ndr <- ggplot(df, aes(x = N, y = NDR)) +
-  geom_line(color = "#440154FF", size = 1) +
-  geom_point(color = "#440154FF", size = 3) +
-  geom_text(aes(label = number(NDR, accuracy = 0.0001)),
-            vjust = -1.2, size = 4.25, colour = "#440154FF") +
-  scale_x_continuous(
-    name = expression(N),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("NDR",
-                     limits = c(min(df$NDR) - 0.0005, max(df$NDR) + 0.0005),
-                     labels = number_format(accuracy = 0.0001)) +
-  theme_bw(base_size = 14) +
+ggplot(df, aes(x = N)) +
+  geom_col(aes(y = `%NA`), fill = "grey80") +
+  geom_line(aes(y = NDR),   color = plasma(5)[1], linewidth = 1.2) +
+  geom_point(aes(y = NDR),  color = plasma(5)[1], size = 3) +
+  scale_x_continuous(name = "N", breaks = pretty_breaks(8)) +
+  scale_y_continuous(
+    name     = "NA",
+    sec.axis = sec_axis(~ ., name = "NDR")) +
+  labs(
+    caption = paste0(
+      "Runs = ", 1000, "    |    ",
+      "Grey = NA, Purple = NDR")) +
+  theme_minimal(base_size = 14) +
   theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# PLOT %NA
-p_na <- ggplot(df, aes(x = N, y = `%NA`)) +
-  geom_area(fill = "#21908CFF", alpha = 0.3) +
-  geom_line(color = "#21908CFF", size = 1) +
-  geom_point(color = "#21908CFF", size = 3) +
-  geom_text(aes(label = number(`%NA`, accuracy = 0.001)),
-            vjust = -1.2, size = 4.25, colour = "#21908CFF") +
-  scale_x_continuous(
-    name = expression(N),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("%NA",
-                     labels = percent_format(scale = 1),
-                     limits = c(0, 50)) +
-  theme_bw(base_size = 14) +
-  theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_text(size = 22),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# Combine with a shared caption
-(p_ndr / p_na) +
-  plot_annotation(
-    caption = paste("Runs =", unique(df$Runs))) &
-  theme(plot.caption = element_text(size = 18, hjust = 1))
+    axis.title.y.left  = element_text(size = 20),
+    axis.title.y.right = element_text(size = 20),
+    axis.title.x = element_text(size = 20),
+    axis.text = element_text(size = 18),
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.caption = element_text(size = 20, hjust = 0)
+  )
 
 # FIGURE 19 --------------------------------------------------------------------
 n_ta_time_df <- read_excel("tables/n_ta_output/n_ta_time_params2.xlsx")
 df <- n_ta_time_df
+df$`%NA` <- df$`%NA`/100
 
 # NDR
-p_ndr <- ggplot(df, aes(x = timesteps, y = NDR)) +
-  geom_line(color = "#440154FF", size = 1) +
-  geom_point(color = "#440154FF", size = 3) +
-  geom_text(aes(label = number(NDR, accuracy = 0.0001)),
-            vjust = 1.2, size = 4.25, colour = "#440154FF") +
-  scale_x_continuous(
-    name = expression(timesteps),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("NDR",
-                     limits = c(min(df$NDR) - 0.0005, max(df$NDR) + 0.0005),
-                     labels = number_format(accuracy = 0.0001)) +
-  theme_bw(base_size = 14) +
+ggplot(df, aes(x = timesteps)) +
+  geom_col(aes(y = `%NA`), fill = "grey80") +
+  geom_line(aes(y = NDR),   color = plasma(5)[1], linewidth = 1.2) +
+  geom_point(aes(y = NDR),  color = plasma(5)[1], size = 3) +
+  scale_x_continuous(name = "Time steps", breaks = pretty_breaks(8)) +
+  scale_y_continuous(
+    name     = "NA",
+    sec.axis = sec_axis(~ ., name = "NDR")) +
+  labs(
+    caption = paste0(
+      "Runs = ", 1000, "    |    ",
+      "Grey = NA, Purple = NDR")) +
+  theme_minimal(base_size = 14) +
   theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# PLOT %NA
-p_na <- ggplot(df, aes(x = timesteps, y = `%NA`)) +
-  geom_area(fill = "#21908CFF", alpha = 0.3) +
-  geom_line(color = "#21908CFF", size = 1) +
-  geom_point(color = "#21908CFF", size = 3) +
-  geom_text(aes(label = number(`%NA`, accuracy = 0.001)),
-            vjust = -1.2, size = 4.25, colour = "#21908CFF") +
-  scale_x_continuous(
-    name = expression(timesteps),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("%NA",
-                     labels = percent_format(scale = 1),
-                     limits = c(0,50)) +
-  theme_bw(base_size = 14) +
-  labs(x = "Time series length (t)") +
-  theme(
-    panel.grid.minor = element_blank(),
+    axis.title.y.left  = element_text(size = 20),
+    axis.title.y.right = element_text(size = 20),
     axis.title.x = element_text(size = 20),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
+    axis.text = element_text(size = 18),
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.caption = element_text(size = 20, hjust = 0)
+  )
 
-# Combine with a shared caption
-(p_ndr / p_na) +
-  plot_annotation(
-    caption = paste("Runs =", unique(df$Runs))) &
-  theme(plot.caption = element_text(size = 18, hjust = 1))
 
 # FIGURE 20 --------------------------------------------------------------------
 n_ta_tw_df <- read_excel("tables/n_ta_output/n_ta_tw_params2.xlsx")
 df <- n_ta_tw_df
-head(df)
+df$`%NA` <- df$`%NA`/100
 
 # NDR
-p_ndr <- ggplot(df, aes(x = `Time window size`, y = NDR)) +
-  geom_line(color = "#440154FF", size = 1) +
-  geom_point(color = "#440154FF", size = 3) +
-  geom_text(aes(label = number(NDR, accuracy = 0.0001)),
-            vjust = -1.2, size = 4.25, colour = "#440154FF") +
-  scale_x_continuous(
-    name = expression(`Time window size`),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("NDR",
-                     limits = c(min(df$NDR) - 0.0005, max(df$NDR) + 0.0005),
-                     labels = number_format(accuracy = 0.0001)) +
-  theme_bw(base_size = 14) +
+ggplot(df, aes(x = `Time window size`)) +
+  geom_col(aes(y = `%NA`), fill = "grey80") +
+  geom_line(aes(y = NDR),   color = plasma(5)[1], linewidth = 1.2) +
+  geom_point(aes(y = NDR),  color = plasma(5)[1], size = 3) +
+  scale_x_continuous(name = "w", breaks = pretty_breaks(8)) +
+  scale_y_continuous(
+    name     = "NA",
+    sec.axis = sec_axis(~ ., name = "NDR")) +
+  labs(
+    caption = paste0(
+      "Runs = ", 1000, "    |    ",
+      "Grey = NA, Purple = NDR")) +
+  theme_minimal(base_size = 14) +
   theme(
-    panel.grid.minor = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# PLOT %NA
-p_na <- ggplot(df, aes(x = `Time window size`, y = `%NA`)) +
-  geom_area(fill = "#21908CFF", alpha = 0.3) +
-  geom_line(color = "#21908CFF", size = 1) +
-  geom_point(color = "#21908CFF", size = 3) +
-  geom_text(aes(label = number(`%NA`, accuracy = 0.001)),
-            vjust = -1.2, size = 4.25, colour = "#21908CFF") +
-  scale_x_continuous(
-    name = expression(`Time window size`),
-    breaks = pretty_breaks(5)) +
-  scale_y_continuous("%NA",
-                     labels = percent_format(scale = 1),
-                     limits = c(0,50)) +
-  theme_bw(base_size = 14) +
-  labs(x = "Time series length (t)") +
-  theme(
-    panel.grid.minor = element_blank(),
+    axis.title.y.left  = element_text(size = 20),
+    axis.title.y.right = element_text(size = 20),
     axis.title.x = element_text(size = 20),
-    axis.title.y = element_text(size = 18),
-    axis.text = element_text(size = 16))
-
-# Combine with a shared caption
-(p_ndr / p_na) +
-  plot_annotation(
-    caption = paste("Runs =", unique(df$Runs))) &
-  theme(plot.caption = element_text(size = 18, hjust = 1))
+    axis.text = element_text(size = 18),
+    panel.grid.major.y = element_line(color = "grey85"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.caption = element_text(size = 20, hjust = 0)
+  )
 
 # FIGURE 21 --------------------------------------------------------------------
 mu_df <- read_excel("tables/cb_snap_output/cb_snap_overall.xlsx", sheet = "mu")
