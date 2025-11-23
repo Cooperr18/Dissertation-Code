@@ -7,10 +7,7 @@ knitr::opts_chunk$set(
   warning = FALSE,
   message = FALSE,
   collapse = TRUE,
-  comment = "#>",
-  fig.path = "man/figures/README-",
-  fig.retina = 2,
-  out.width = "100%"
+  comment = "#>"
 )
 ```
 
@@ -71,9 +68,6 @@ invisible(lapply(pkgs, library, character.only = TRUE))
 library(signatselect)
 ```
 
-
-
-
 ## Methods {#methods}
 
 We conduct two simulation-based experiments modelling cultural transmission. Both use base parameters: population size (`N`), innovation rate (`μ`), a burn-in period (`B`), discrete time units (`t`), and time window size (`w`) for averaging. Thus, we simulate three transmission models:
@@ -84,7 +78,7 @@ We conduct two simulation-based experiments modelling cultural transmission. Bot
 
 Each experiment is paired with two temporal deposition schemes: a **snapshot** regime (fine-grained ideal deposition)
 
-```{r snapshot, fig.align='center', echo=FALSE}
+```{r snapshot, echo=FALSE, eval=FALSE}
 neutral_snapshot_fig <- function(N, mu, burnin, timesteps, n_variants = 4, n_runs) {
   
   all_runs <- vector("list", n_runs)
@@ -165,10 +159,11 @@ ggplot(neutral_snap_traj, aes(x = time, y = frequency,
   labs(x = "Time step", y = "Frequency") +
   facet_wrap(~ variant, ncol = 2)
 ```
+![Snapshot regime](figures/Draft_figures/6_snap_traj.png)
 
 and **time-averaging** regime (coarse-grained, palimpsest deposition).
 
-```{r time-averaging, fig.align='center', echo=FALSE}
+```{r time-averaging, echo=FALSE, eval=FALSE}
 neutral_ta_fig <- function(N, mu, burnin, timesteps, n_variants = 4, n_runs,
                            time_window = 20) {
   
@@ -261,6 +256,7 @@ ggplot(neutral_ta_traj, aes(x = bin, y = frequency,
   labs(x = "Time bin", y = "Frequency") + 
   facet_wrap(~ variant, ncol = 2)
 ```
+![Time averaging regime](figures/Draft_figures/7_ta_traj.png)
 
 ## Reproduce experiments {#reproduce-experiments}
 
@@ -495,7 +491,7 @@ write_xlsx(n_snap_mu_results, "tables/n_snap_output/n_snap_mu_params.xlsx") # mu
 
 And then plot the results (for a more detailed description of figure reproducibility, see [Further remarks](#Further-remarks)):
 
-```{r neutral snap mu, fig.align='center'}
+```{r neutral snap mu, eval=FALSE}
 # import sweep
 n_snap_mu_df <- read_excel("tables/n_snap_output/n_snap_mu_params2.xlsx")
 df <- n_snap_mu_df
@@ -526,6 +522,7 @@ ggplot(df, aes(x = `mu`)) +
     plot.caption = element_text(size = 20, hjust = 0)
   )
 ```
+![Mu snapshot sweep](figures/Draft_figures/14_mu_snap_sweepp.png)
 
 ### Experiment 1
 
@@ -543,7 +540,7 @@ To provide full transparency of the decision-making process along the realizatio
 
 Furthermore, all listed figures can be found at [`model_sims_plots.R`](https://github.com/Cooperr18/Dissertation-Code/blob/master/scripts/model_sims_plots.R). It is a script that breaks down the code for each numbered figure in the dissertation. Again, to fully reproduce them the workflow should follow [Reproduce experiments](#Reproduce-experiments): store the model functions, the parameter combinations and run the functions for each set; store the output, and import using `read_excel()`. In some cases, referral to other scripts is not mandatory, as the functions are often included within this script. E.g.:
 
-```{r unbiased transmission, fig.align='center'}
+```{r unbiased transmission, eval=FALSE}
 neutral_snapshot <- function(N, mu, timesteps, p_value_lvl, n_runs) {
   runs <- vector("list", length = n_runs)
   
@@ -617,10 +614,11 @@ ggplot(all_results, aes(x = time, y = freq, color = factor(run))) +
     panel.spacing = unit(1.5, "lines")  # Extra space between facets
   )
 ```
+![Unbiased transmission](figures/Draft_figures/3a_neutral_sims.png)
 
 But in other figures the user will need to import the data from spreadsheets available at [tables](https://github.com/Cooperr18/Dissertation-Code/tree/master/tables), with sub-folders for each one of the models:
 
-```{r fig 15, fig.align='center'}
+```{r fig 15, eval=FALSE}
 # FIGURE 15 --------------------------------------------------------------------
 n_snap_N_df <- read_excel("tables/n_snap_output/n_snap_N_params2.xlsx")
 df <- n_snap_N_df
@@ -651,6 +649,7 @@ ggplot(df, aes(x = N)) +
     plot.caption = element_text(size = 20, hjust = 0)
   )
 ```
+![N snapshot sweep](figures/Draft_figures/15_N_snap_sweepp.png)
 
 ## Final remark {#final-remark}
 

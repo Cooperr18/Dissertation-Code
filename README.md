@@ -104,11 +104,19 @@ transmission models:
 Each experiment is paired with two temporal deposition schemes: a
 **snapshot** regime (fine-grained ideal deposition)
 
-<img src="man/figures/README-snapshot-1.png" width="100%" style="display: block; margin: auto;" />
+<figure>
+<img src="figures/Draft_figures/6_snap_traj.png"
+alt="Snapshot regime" />
+<figcaption aria-hidden="true">Snapshot regime</figcaption>
+</figure>
 
 and **time-averaging** regime (coarse-grained, palimpsest deposition).
 
-<img src="man/figures/README-time-averaging-1.png" width="100%" style="display: block; margin: auto;" />
+<figure>
+<img src="figures/Draft_figures/7_ta_traj.png"
+alt="Time averaging regime" />
+<figcaption aria-hidden="true">Time averaging regime</figcaption>
+</figure>
 
 ## Reproduce experiments
 
@@ -382,7 +390,11 @@ ggplot(df, aes(x = `mu`)) +
   )
 ```
 
-<img src="man/figures/README-neutral snap mu-1.png" width="100%" style="display: block; margin: auto;" />
+<figure>
+<img src="figures/Draft_figures/14_mu_snap_sweepp.png"
+alt="Mu snapshot sweep" />
+<figcaption aria-hidden="true">Mu snapshot sweep</figcaption>
+</figure>
 
 ### Experiment 1
 
@@ -512,7 +524,11 @@ ggplot(all_results, aes(x = time, y = freq, color = factor(run))) +
   )
 ```
 
-<img src="man/figures/README-unbiased transmission-1.png" width="100%" style="display: block; margin: auto;" />
+<figure>
+<img src="figures/Draft_figures/3a_neutral_sims.png"
+alt="Unbiased transmission" />
+<figcaption aria-hidden="true">Unbiased transmission</figcaption>
+</figure>
 
 But in other figures the user will need to import the data from
 spreadsheets available at
@@ -551,7 +567,11 @@ ggplot(df, aes(x = N)) +
   )
 ```
 
-<img src="man/figures/README-fig 15-1.png" width="100%" style="display: block; margin: auto;" />
+<figure>
+<img src="figures/Draft_figures/15_N_snap_sweepp.png"
+alt="N snapshot sweep" />
+<figcaption aria-hidden="true">N snapshot sweep</figcaption>
+</figure>
 
 ## Final remark
 
